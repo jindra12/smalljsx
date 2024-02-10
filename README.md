@@ -1,1 +1,1 @@
-# smalljsx
+# SmallJSX

@@ -1,0 +1,15 @@
+{
+  "name": "smalljsx",
+  "version": "0.0.1",
+  "description": "Smallest JSX TypeScript rendering library yet",
+  "main": "index.js",
+  "repository": "https://github.com/jindra12/smalljsx.git",
+  "author": "Jan Jindráček",
+  "license": "MIT",
+  "man": ["./README.md"],
+  "keywords": ["JSX", "rendering", "framework", "no dependency", "typescript", "utility", "HTML", "DOM"],
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}
