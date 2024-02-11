@@ -50,16 +50,27 @@ const executeChildren = (
     return acc;
 };
 
+let count = 0;
+const getUniqueId = () => {
+    count++;
+    return `id__${count}`;
+};
+
 class HooksStack {
     stored: any[] = [];
+    postActions: Array<() => void> = [];
+    unmountActions: Array<() => void> = [];
     index = 0;
+    rerender = false;
 
     reset = () => {
         if (this.index !== this.stored.length - 1) {
             throw `Conditional calls to hooks not allowed!`;
         }
+        this.rerender = false;
+        this.postActions = [];
         this.index = 0;
-    }
+    };
 
     storeStack = (initialState: any) => {
         if (this.index < this.stored.length) {
@@ -70,8 +81,9 @@ class HooksStack {
         this.index++;
     };
 
-    updateStack = (index: number, state: any) => {
+    updateStack = (index: number, state: any, rerender: boolean) => {
         this.stored[index] = state;
+        this.rerender = rerender;
     };
 
     hasStack = () => this.index < this.stored.length;
@@ -79,34 +91,135 @@ class HooksStack {
     peekStack = () => this.stored[this.index];
 }
 
-export const useState = <T>(initialState?: T | (() => T)): [T, (value: T | ((prevValue: T) => T)) => void] => {
+export const useState = <T>(
+    initialState?: T | (() => T)
+): [T, (value: T | ((prevValue: T) => T)) => void] => {
     const hooks = context.pointer.hooks;
     const index = hooks.index;
-    const currentState = hooks.hasStack() ? hooks.peekStack() : (typeof initialState === "function" ? (initialState as Function)() : initialState);
+    const currentState = hooks.hasStack()
+        ? hooks.peekStack()
+        : typeof initialState === "function"
+            ? (initialState as Function)()
+            : initialState;
     hooks.storeStack(currentState);
-    return [currentState, (nextValue) => {
-        const nextState = typeof nextValue === "function" ? (nextValue as any)(currentState) : currentState;
-        hooks.updateStack(index, nextState);
-    }];
+    return [
+        currentState,
+        (nextValue) => {
+            const nextState =
+                typeof nextValue === "function"
+                    ? (nextValue as any)(currentState)
+                    : currentState;
+            hooks.updateStack(index, nextState, true);
+        },
+    ];
 };
 
 export const useRef = <T>(initialRef?: T | (() => T)): { current: T } => {
     const hooks = context.pointer.hooks;
     const index = hooks.index;
-    const currentRef = hooks.hasStack() ? hooks.peekStack() : (typeof initialRef === "function" ? (initialRef as Function)() : initialRef);
+    const currentRef = hooks.hasStack()
+        ? hooks.peekStack()
+        : typeof initialRef === "function"
+            ? (initialRef as Function)()
+            : initialRef;
     hooks.storeStack(currentRef);
     return {
         get current() {
             return currentRef;
         },
         set current(value: T) {
-            hooks.updateStack(index, value);
+            hooks.updateStack(index, value, false);
         },
     };
 };
 
-export const useEffect = (effect: () => void, type: "mount" | "unmount" | "before-render" | "after-render", deps: any[]) => {
-    
+const getHasChangedDeps = (
+    deps: any[],
+    depsGetter: (deps: any) => any[],
+    depsSetter: (deps: any[]) => any
+) => {
+    const hooks = context.pointer.hooks;
+    let hasChangedDeps = false;
+    if (hooks.hasStack()) {
+        const currentDeps: any[] = depsGetter(hooks.peekStack());
+        if (currentDeps.length !== deps.length) {
+            throw `Deps in useEffect must always have the same length`;
+        }
+        for (let i = 0; i < currentDeps.length; i++) {
+            if (hasChangedDeps) {
+                break;
+            }
+            hasChangedDeps = currentDeps[i] !== deps[i];
+        }
+    } else {
+        hasChangedDeps = true;
+    }
+    const currentStack =
+        hooks.hasStack() && !hasChangedDeps ? hooks.peekStack() : depsSetter(deps);
+    hooks.storeStack(currentStack);
+    return hasChangedDeps;
+};
+
+export const useEffect = (
+    effect: () => void,
+    type: "before-render" | "after-render",
+    deps: any[]
+) => {
+    const hooks = context.pointer.hooks;
+    const hasChangedDeps = getHasChangedDeps(
+        deps,
+        (deps) => deps,
+        (deps) => deps
+    );
+    if (hasChangedDeps) {
+        if (type === "before-render") {
+            effect();
+        } else {
+            hooks.postActions.push(effect);
+        }
+    }
+};
+
+export const useMemo = <T>(value: () => T, deps: any[]) => {
+    interface DepsObject {
+        value: T;
+        deps: any[];
+    }
+    const hooks = context.pointer.hooks;
+    let nextValue: T = hooks.peekStack()?.value;
+    getHasChangedDeps(
+        deps,
+        (deps: DepsObject) => deps.deps,
+        (deps: any[]): DepsObject => {
+            nextValue = value();
+            return {
+                value: nextValue,
+                deps: deps,
+            };
+        }
+    );
+    return nextValue;
+};
+
+export const useCallback = <T extends (...args: any[]) => any>(
+    value: T,
+    deps: any[]
+) => useMemo(() => value, deps);
+
+export const useMountEffect = (effect: () => void) =>
+    useEffect(effect, "before-render", []);
+
+export const useEachRenderEffect = (
+    effect: () => void,
+    type: "before-render" | "after-render"
+) => useEffect(effect, type, [getUniqueId()]);
+
+export const useUnmountEffect = (effect: () => void) => {
+    const hooks = context.pointer.hooks;
+    if (!hooks.hasStack()) {
+        hooks.unmountActions.push(effect);
+    }
+    hooks.storeStack("unmount");
 };
 
 type Stack = {
@@ -135,7 +248,8 @@ class Context {
         this.pointer = this.root;
     }
     startComponentStack = (component: Function | string, key?: string) => {
-        const previous = this.pointer.children[key || this.pointer.childrenCount.toString() || ""];
+        const previous =
+            this.pointer.children[key || this.pointer.childrenCount.toString() || ""];
         if (previous && previous.component === component) {
             previous.updated++;
             this.pointer = previous;
@@ -166,8 +280,16 @@ class Context {
             if (child.new) {
                 child.new = false;
             } else if (child.updated < max) {
+                const unmountActions = this.pointer.hooks.unmountActions;
+                for (let i = 0; i < unmountActions.length; i++) {
+                    unmountActions[i]();
+                }
                 delete this.pointer.children[key];
             }
+        }
+        const postActions = this.pointer.hooks.postActions;
+        for (let i = 0; i < postActions.length; i++) {
+            postActions[i]();
         }
         this.pointer.hooks.reset();
         this.pointer = this.pointer.parent!;
@@ -216,10 +338,7 @@ const createTag = <T>(
             }
         }
     }
-    context.startComponentStack(
-        component,
-        (props as any).key?.toString() || ""
-    );
+    context.startComponentStack(component, (props as any).key?.toString() || "");
     resolveChildren(htmlTag, children, context);
     context.endComponentStack();
     return htmlTag;
@@ -235,10 +354,7 @@ const createComponent = <T>(
             return executeChildren(children, context);
         },
     }) as any as T;
-    context.startComponentStack(
-        component,
-        (copiedProps as any).key?.toString()
-    );
+    context.startComponentStack(component, (copiedProps as any).key?.toString());
     const htmlTag = component(copiedProps);
     context.endComponentStack();
     return htmlTag;
