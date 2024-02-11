@@ -307,7 +307,7 @@ declare namespace JSX {
     interface ElementChildrenAttribute {
         children: {}
     }
-    type RenderingChildren = ((context: JSX.Context) => HTMLElement) | ((context: JSX.Context) => Fragment) | string | number | boolean | null | undefined;
+    type RenderingChildren = (() => HTMLElement) | (() => Fragment) | string | number | boolean | null | undefined;
     type ResolvedChildren = HTMLElement | string | number | boolean | null | undefined;
     type ChildType = HTMLElement[] | HTMLElement | string | string[] | number | number[] | boolean | boolean[] | undefined;
     type Context = {
@@ -325,4 +325,4 @@ declare var h: <T extends object>(
     component: JSX.Fragment | string | ((props?: T) => JSX.Element),
     props?: T | null,
     ...children: JSX.RenderingChildren[]
-) => (context: JSX.Context) => HTMLElement;
+) => HTMLElement;

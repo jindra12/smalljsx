@@ -25,7 +25,7 @@ const executeChildren = (
     const acc: JSX.ResolvedChildren[] = [];
     for (let i = 0; i < children.length; i++) {
         const child = children[i];
-        const executed = typeof child === "function" ? child(context) : child;
+        const executed = typeof child === "function" ? child() : child;
         if (isFragment(executed)) {
             const moreChildren = !executed.children
                 ? []
@@ -293,11 +293,6 @@ class Context {
     };
 }
 
-interface WindowExtended extends Window {
-    mount?: Record<string, Context>;
-    h?: typeof h;
-}
-
 let context = new Context();
 
 const resolveChildren = (
@@ -359,7 +354,7 @@ const createComponent = <T>(
     return htmlTag;
 };
 
-export const mount = (hResult: HTMLElement | Fragment, mountPoint: string | HTMLElement, replace: boolean = true) => {
+export const mount = (hResult: HTMLElement | Fragment | (() => HTMLElement) | (() => Fragment), mountPoint: string | HTMLElement, replace: boolean = true) => {
     const entryPoint = typeof mountPoint === "string" ? document.querySelector<HTMLElement>(mountPoint) : mountPoint;
     if (!entryPoint) {
         throw `Could not find element ${mountPoint}`;
@@ -367,10 +362,19 @@ export const mount = (hResult: HTMLElement | Fragment, mountPoint: string | HTML
     if (replace) {
         entryPoint.innerHTML = "";
     }
-    if (hResult instanceof Fragment) {
-        resolveChildren(entryPoint, hResult.children || []);
+    if (typeof hResult === "function") {
+        const exec = hResult();
+        if (exec instanceof Fragment) {
+            resolveChildren(entryPoint, exec.children || []);
+        } else {
+            entryPoint.appendChild(exec);
+        }
     } else {
-        entryPoint.appendChild(hResult);
+        if (hResult instanceof Fragment) {
+            resolveChildren(entryPoint, hResult.children || []);
+        } else {
+            entryPoint.appendChild(hResult);
+        }
     }
 };
 
@@ -378,8 +382,8 @@ export const h = <T>(
     component: (new () => Fragment) | string | ((props?: T) => JSX.Element),
     props: T | null,
     ...children: JSX.RenderingChildren[]
-): HTMLElement | Fragment => {
-    return typeof component === "string"
+): () => HTMLElement | Fragment => {
+    return () => typeof component === "string"
         ? createTag(component, props, children)
         : isFragmentConstructor(component)
             ? new Fragment(children)
@@ -387,6 +391,5 @@ export const h = <T>(
 };
 
 if (typeof window !== undefined) {
-    (window as WindowExtended).h = h;
-    (window as WindowExtended).mount = {};
+    (window as any).h = h;
 }
