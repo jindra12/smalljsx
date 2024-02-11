@@ -69,7 +69,6 @@
   "exclude": [
     "./test",
     "./testproject",
-    "./types",
     "./dist"
   ]
 }
