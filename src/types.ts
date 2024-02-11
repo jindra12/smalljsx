@@ -5,6 +5,7 @@ type ElementType<K extends keyof HTMLElementTagNameMap> = Partial<
     >
 >;
 type BannedKeys =
+    | "align"
     | "accessKey"
     | "accessKeyLabel"
     | "after"
@@ -92,21 +93,25 @@ type BannedKeys =
     | "getAnimations"
     | "attributeStyleMap";
 
+type ValidationBannedKeys =
+| "form"
+| "labels"
+| "validationMessage"
+| "validity"
+| "willValidate"
+| "checkValidity"
+| "reportValidity"
+| "setCustomValidity";
+
 type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
-    K extends "HTMLInputElement"
+    K extends "input"
     ?
-    | "checkValidity"
-    | "reportValidity"
+    | ValidationBannedKeys
     | "files"
-    | "form"
-    | "labels"
     | "list"
     | "useMap"
-    | "validationMessage"
-    | "validity"
     | "webkitEntries"
     | "webkitdirectory"
-    | "willValidate"
     | "select"
     | "setCustomValidity"
     | "setRangeText"
@@ -114,32 +119,181 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "showPicker"
     | "stepDown"
     | "stepUp"
-    : K extends "HTMLAnchorElement"
+    : K extends "a"
     ?
     | "relList"
-    | "rev"
     | "text"
     | "charset"
     | "coords"
     | "name"
     | "shape"
-    : K extends "HTMLAreaElement"
+    : K extends "area"
     ?
-    | "noHref"
     | "relList"
-    : K extends "HTMLBRElement"
+    : K extends "br"
     ? "clear"
-    : K extends "HTMLBodyElement"
+    : K extends "body"
     ?
     | "aLink"
-    | "background"
-    | "bgColor"
     | "link"
     | "text"
     | "vLink"
-    : K extends "HTMLButtonElement"
+    : K extends "button"
+    ? ValidationBannedKeys
+    : K extends "canvas"
     ?
-    | ""
+    | "captureStream"
+    | "getContext"
+    | "toBlob"
+    | "toDataURL"
+    | "transferControlToOffscreen"
+    : K extends "datalist"
+    ?
+    | "options"
+    : K extends "dialog"
+    ?
+    | "close"
+    | "show"
+    | "showModal"
+    : K extends "embed"
+    ?
+    | "getSVGDocument"
+    : K extends "fieldset"
+    ?
+    | "elements"
+    | ValidationBannedKeys
+    : K extends "form"
+    ?
+    | "elements"
+    | "length"
+    | "relList"
+    | "reset"
+    | "submit"
+    | number
+    | ValidationBannedKeys
+    | "requestSubmit"
+    : K extends "iframe"
+    ?
+    | "contentDocument"
+    | "contentWindow"
+    | "sandbox"
+    | "getSVGDocument"
+    : K extends "img"
+    ?
+    | "complete"
+    | "currentSrc"
+    | "longDesc"
+    | "name"
+    | "naturalHeight"
+    | "naturalWidth"
+    | "decode"
+    : K extends "label"
+    ?
+    | "control"
+    | "form"
+    : K extends "label"
+    ?
+    | "form"
+    : K extends "link"
+    ?
+    | "relList"
+    : K extends "map"
+    ?
+    | "areas"
+    : K extends "meter"
+    ?
+    | "labels"
+    : K extends "object"
+    ?
+    | ValidationBannedKeys
+    | "contentDocument"
+    | "contentWindow"
+    | "getSVGDocument"
+    : K extends "option"
+    ?
+    | "index"
+    : K extends "output"
+    ?
+    | ValidationBannedKeys
+    | "htmlFor"
+    | "type"
+    : K extends "progress"
+    ?
+    | "labels"
+    | "position"
+    : K extends "select"
+    ?
+    | ValidationBannedKeys
+    | "options"
+    | "selectedOptions"
+    | "type"
+    | "add"
+    | "item"
+    | "namedItem"
+    | "remove"
+    | number
+    : K extends "slot"
+    ?
+    | "assign"
+    | "assignedElements"
+    | "assignedNodes"
+    : K extends "table"
+    ?
+    | "rows"
+    | "tBodies"
+    | "tFoot"
+    | "tHead"
+    | "createCaption"
+    | "createTBody"
+    | "createTFoot"
+    | "createTHead"
+    | "deleteCaption"
+    | "deleteRow"
+    | "deleteTFoot"
+    | "deleteTHead"
+    | "insertRow"
+    : K extends ("tbody" | "tfoot" | "thead")
+    ?
+    | "rows"
+    | "deleteRow"
+    | "insertRow"
+    : K extends ("td" | "th")
+    ?
+    | "cellIndex"
+    : K extends "template"
+    ?
+    | "content"
+    : K extends "textarea"
+    ?
+    | ValidationBannedKeys
+    | "textLength"
+    | "type"
+    | "select"
+    | "setRangeText"
+    | "setSelectionRange"
+    : K extends "tr"
+    ?
+    | "cells"
+    | "rowIndex"
+    | "sectionRowIndex"
+    | "deleteCell"
+    | "insertCell"
+    : K extends "track"
+    ?
+    | "readyState"
+    | "track"
+    | "NONE"
+    | "LOADING"
+    | "LOADED"
+    | "ERROR"
+    : K extends "video"
+    ?
+    | "videoHeight"
+    | "videoWidth"
+    | "cancelVideoFrameCallback"
+    | "getVideoPlaybackQuality"
+    | "requestPictureInPicture"
+    | "requestVideoFrameCallback"
     : never;
 
 declare namespace JSX {
