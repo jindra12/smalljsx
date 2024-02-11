@@ -1,3 +1,4 @@
+import { mount } from ".";
 import { Component, ParentComponent } from "./types";
 
 export const Test: Component = () => (
@@ -11,3 +12,5 @@ export const Test1: ParentComponent = (props) => (
 export const Test2: Component = () => (
     <Test1><><div /></></Test1>
 );
+
+mount(<Test2 />);
