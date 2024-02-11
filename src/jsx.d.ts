@@ -296,8 +296,6 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "requestVideoFrameCallback"
     : never;
 
-type ChildType = HTMLElement[] | HTMLElement | string | string[] | number | number[] | boolean | boolean[] | undefined;
-
 declare namespace JSX {
     type IntrinsicElements = {
         [K in keyof HTMLElementTagNameMap]: (ElementType<K> & {
@@ -308,13 +306,22 @@ declare namespace JSX {
     interface ElementChildrenAttribute {
         children: {}
     }
+    type RenderingChildren = ((context: JSX.Context) => HTMLElement) | ((context: JSX.Context) => Fragment) | string | number | boolean | null | undefined;
+    type ResolvedChildren = HTMLElement | string | number | boolean | null | undefined;
+    type ChildType = HTMLElement[] | HTMLElement | string | string[] | number | number[] | boolean | boolean[] | undefined;
+    type Context = {
+        startComponentStack: <T>(component: string | ((props: T) => HTMLElement), key?: string) => void;
+        endComponentStack: () => void;
+    };
+    class Fragment {
+        children?: ChildType | ChildType[]
+    }
 }
 
-type RenderingChildren = (() => HTMLElement) | string | number | boolean | null | undefined;
-type ResolvedChildren = HTMLElement | string | number | boolean | null | undefined;
+declare var Fragment: JSX.Fragment;
 
 declare var h: <T extends object>(
-    component: string | ((props?: T) => JSX.Element),
+    component: JSX.Fragment | string | ((props?: T) => JSX.Element),
     props?: T | null,
-    ...children: RenderingChildren[]
-) => () => HTMLElement;
+    ...children: JSX.RenderingChildren[]
+) => (context: JSX.Context) => HTMLElement;

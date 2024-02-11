@@ -9,5 +9,5 @@ export const Test1: ParentComponent = (props) => (
 );
 
 export const Test2: Component = () => (
-    <Test1><div /></Test1>
+    <Test1><><div /></></Test1>
 );
