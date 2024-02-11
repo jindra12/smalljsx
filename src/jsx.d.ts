@@ -300,6 +300,7 @@ declare namespace JSX {
     type IntrinsicElements = {
         [K in keyof HTMLElementTagNameMap]: (ElementType<K> & {
             children?: ChildType | ChildType[];
+            ref?: { current?: HTMLElementTagNameMap[K] }
         });
     };
     type Element = HTMLElement;

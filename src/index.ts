@@ -1,9 +1,7 @@
 class Fragment {
     children?: JSX.RenderingChildren[];
-    context?: JSX.Context;
-    constructor(context?: JSX.Context, children?: JSX.RenderingChildren[]) {
+    constructor(children?: JSX.RenderingChildren[]) {
         this.children = children;
-        this.context = context;
     }
 }
 
@@ -22,8 +20,7 @@ const isFragment = (
 ): component is JSX.Fragment => component instanceof Fragment;
 
 const executeChildren = (
-    children: JSX.RenderingChildren[],
-    context: JSX.Context
+    children: JSX.RenderingChildren[]
 ) => {
     const acc: JSX.ResolvedChildren[] = [];
     for (let i = 0; i < children.length; i++) {
@@ -306,9 +303,8 @@ let context = new Context();
 const resolveChildren = (
     htmlTag: HTMLElement,
     children: JSX.RenderingChildren[],
-    context: JSX.Context
 ) => {
-    const executed = executeChildren(children, context);
+    const executed = executeChildren(children);
     for (let i = 0; i < executed.length; i++) {
         const child = executed[i];
         if (child instanceof HTMLElement) {
@@ -339,7 +335,10 @@ const createTag = <T>(
         }
     }
     context.startComponentStack(component, (props as any).key?.toString() || "");
-    resolveChildren(htmlTag, children, context);
+    resolveChildren(htmlTag, children);
+    if ((props as any)?.ref) {
+        (props as any).ref.current = htmlTag;
+    }
     context.endComponentStack();
     return htmlTag;
 };
@@ -351,7 +350,7 @@ const createComponent = <T>(
 ) => {
     const copiedProps = Object.assign({}, props || {}, {
         get children() {
-            return executeChildren(children, context);
+            return executeChildren(children);
         },
     }) as any as T;
     context.startComponentStack(component, (copiedProps as any).key?.toString());
@@ -360,8 +359,19 @@ const createComponent = <T>(
     return htmlTag;
 };
 
-export const mount = (hResult: HTMLElement) => {
-    (hResult as any as (context: JSX.Context) => HTMLElement)(context);
+export const mount = (hResult: HTMLElement | Fragment, mountPoint: string | HTMLElement, replace: boolean = true) => {
+    const entryPoint = typeof mountPoint === "string" ? document.querySelector<HTMLElement>(mountPoint) : mountPoint;
+    if (!entryPoint) {
+        throw `Could not find element ${mountPoint}`;
+    }
+    if (replace) {
+        entryPoint.innerHTML = "";
+    }
+    if (hResult instanceof Fragment) {
+        resolveChildren(entryPoint, hResult.children || []);
+    } else {
+        entryPoint.appendChild(hResult);
+    }
 };
 
 export const h = <T>(
@@ -372,7 +382,7 @@ export const h = <T>(
     return typeof component === "string"
         ? createTag(component, props, children)
         : isFragmentConstructor(component)
-            ? new Fragment(context, children)
+            ? new Fragment(children)
             : createComponent(component, props, children);
 };
 
