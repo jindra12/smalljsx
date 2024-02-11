@@ -296,16 +296,25 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "requestVideoFrameCallback"
     : never;
 
+type ChildType = HTMLElement[] | HTMLElement | string | string[] | number | number[] | boolean | boolean[] | undefined;
+
 declare namespace JSX {
     type IntrinsicElements = {
-        [K in keyof HTMLElementTagNameMap]: ElementType<K>;
+        [K in keyof HTMLElementTagNameMap]: (ElementType<K> & {
+            children?: ChildType | ChildType[];
+        });
     };
-    type Element = HTMLElement | string | null | undefined | number | boolean | number;
-    type ElementChildrenAttribute = JSX.Element | JSX.Element[];
+    type Element = HTMLElement;
+    interface ElementChildrenAttribute {
+        children: {}
+    }
 }
+
+type RenderingChildren = (() => HTMLElement) | string | number | boolean | null | undefined;
+type ResolvedChildren = HTMLElement | string | number | boolean | null | undefined;
 
 declare var h: <T extends object>(
     component: string | ((props?: T) => JSX.Element),
     props?: T | null,
-    ...children: (HTMLElement | string | number | boolean | null | undefined)[]
-) => HTMLElement;
+    ...children: RenderingChildren[]
+) => () => HTMLElement;
