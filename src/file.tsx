@@ -13,4 +13,4 @@ export const Test2: Component = () => (
     <Test1><><div /></></Test1>
 );
 
-mount(<Test2 />);
+mount(<Test2 />, "#root");

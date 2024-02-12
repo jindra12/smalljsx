@@ -299,30 +299,28 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
 declare namespace JSX {
     type IntrinsicElements = {
         [K in keyof HTMLElementTagNameMap]: (ElementType<K> & {
-            children?: ChildType | ChildType[];
+            children?: Element | Element[];
             ref?: { current?: HTMLElementTagNameMap[K] }
         });
     };
-    type Element = HTMLElement;
+    type Element = (() => HTMLElement) | (() => Fragment) | string | number | boolean | null | undefined;
     interface ElementChildrenAttribute {
         children: {}
     }
-    type RenderingChildren = (() => HTMLElement) | (() => Fragment) | string | number | boolean | null | undefined;
     type ResolvedChildren = HTMLElement | string | number | boolean | null | undefined;
-    type ChildType = HTMLElement[] | HTMLElement | string | string[] | number | number[] | boolean | boolean[] | undefined;
     type Context = {
         startComponentStack: <T>(component: string | ((props: T) => HTMLElement), key?: string) => void;
         endComponentStack: () => void;
     };
     class Fragment {
-        children?: ChildType | ChildType[]
+        children?: Element[]
     }
 }
 
 declare var Fragment: JSX.Fragment;
 
 declare var h: <T extends object>(
-    component: JSX.Fragment | string | ((props?: T) => JSX.Element),
+    component: string | ((props?: T) => HTMLElement),
     props?: T | null,
-    ...children: JSX.RenderingChildren[]
-) => HTMLElement;
+    ...children: JSX.Element[]
+) => () => (HTMLElement | JSX.Fragment);

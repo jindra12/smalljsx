@@ -1,12 +1,12 @@
 class Fragment {
-    children?: JSX.RenderingChildren[];
-    constructor(children?: JSX.RenderingChildren[]) {
+    children?: JSX.Element[];
+    constructor(children?: JSX.Element[]) {
         this.children = children;
     }
 }
 
 const isFragmentConstructor = (
-    component: (new () => Fragment) | string | ((props?: any) => JSX.Element)
+    component: any
 ): component is new () => Fragment => component === Fragment;
 
 const isFragment = (
@@ -19,34 +19,6 @@ const isFragment = (
         | null
         | undefined
 ): component is JSX.Fragment => component instanceof Fragment;
-
-const executeChildren = (
-    children: JSX.RenderingChildren[]
-) => {
-    const acc: JSX.ResolvedChildren[] = [];
-    for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        const executed = typeof child === "function" ? child() : child;
-        if (isFragment(executed)) {
-            const moreChildren = !executed.children
-                ? []
-                : Array.isArray(executed.children)
-                    ? executed.children
-                    : [executed.children];
-            for (let j = 0; j < moreChildren.length; j++) {
-                const subChild = moreChildren[j];
-                if (Array.isArray(subChild)) {
-                    acc.push(...subChild);
-                } else {
-                    acc.push(subChild);
-                }
-            }
-        } else {
-            acc.push(executed);
-        }
-    }
-    return acc;
-};
 
 let count = 0;
 const getUniqueId = () => {
@@ -252,6 +224,7 @@ type Stack = {
     new: boolean;
     parent?: Stack;
     hooks: HooksStack;
+    rendered?: (HTMLElement | Text);
     treeContext: Record<string, any>;
 };
 
@@ -295,6 +268,17 @@ class Context {
             this.pointer = nextStack;
         }
     };
+    processJSXToHtml = (element: JSX.Element): (Text | HTMLElement) => {
+        const executed = typeof element === "function" ? element() : element;
+        return executed instanceof HTMLElement ? executed : document.createTextNode(executed?.toString() || "");
+    };
+    processJSXToHtmlCached = (element: JSX.Element): (Text | HTMLElement) => {
+        if (this.pointer.hooks.rerender || !this.pointer.rendered) {
+            this.pointer.rendered?.remove();
+            this.pointer.rendered = this.processJSXToHtml(element);
+        }
+        return this.pointer.rendered!;
+    };
     endComponentStack = () => {
         let max = 0;
         for (const key in this.pointer.children) {
@@ -306,7 +290,7 @@ class Context {
             if (child.new) {
                 child.new = false;
             } else if (child.updated < max) {
-                const unmountActions = this.pointer.hooks.unmountActions;
+                const unmountActions = child.hooks.unmountActions;
                 for (let i = 0; i < unmountActions.length; i++) {
                     unmountActions[i]();
                 }
@@ -324,9 +308,25 @@ class Context {
 
 let context = new Context();
 
+const executeChildren = (
+    children: JSX.Element[]
+) => {
+    const acc: JSX.ResolvedChildren[] = [];
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const executed = typeof child === "function" ? child() : child;
+        if (isFragment(executed)) {
+            acc.push(...executeChildren(executed.children || []));
+        } else {
+            acc.push(executed);
+        }
+    }
+    return acc;
+};
+
 const resolveChildren = (
     htmlTag: HTMLElement,
-    children: JSX.RenderingChildren[],
+    children: JSX.Element[],
 ) => {
     const executed = executeChildren(children);
     for (let i = 0; i < executed.length; i++) {
@@ -342,7 +342,7 @@ const resolveChildren = (
 const createTag = <T>(
     component: string,
     props: T | null,
-    children: JSX.RenderingChildren[]
+    children: JSX.Element[]
 ): HTMLElement => {
     const htmlTag = document.createElement(component);
     for (const key in props || {}) {
@@ -370,20 +370,20 @@ const createTag = <T>(
 const createComponent = <T>(
     component: (props?: T) => JSX.Element,
     props: T | null,
-    children: JSX.RenderingChildren[]
-) => {
+    children: JSX.Element[]
+): (HTMLElement | Text) => {
     const copiedProps = Object.assign({}, props || {}, {
         get children() {
             return executeChildren(children);
         },
     }) as any as T;
     context.startComponentStack(component, (copiedProps as any).key?.toString());
-    const htmlTag = component(copiedProps);
+    const htmlTag = context.processJSXToHtmlCached(component(copiedProps));
     context.endComponentStack();
     return htmlTag;
 };
 
-export const mount = (hResult: HTMLElement | Fragment | (() => HTMLElement) | (() => Fragment), mountPoint: string | HTMLElement, replace: boolean = true) => {
+export const mount = (hResult: JSX.Element, mountPoint: string | HTMLElement, replace: boolean = true) => {
     const entryPoint = typeof mountPoint === "string" ? document.querySelector<HTMLElement>(mountPoint) : mountPoint;
     if (!entryPoint) {
         throw `Could not find element ${mountPoint}`;
@@ -393,30 +393,34 @@ export const mount = (hResult: HTMLElement | Fragment | (() => HTMLElement) | ((
     }
     if (typeof hResult === "function") {
         const exec = hResult();
-        if (exec instanceof Fragment) {
+        if (isFragment(exec)) {
             resolveChildren(entryPoint, exec.children || []);
         } else {
             entryPoint.appendChild(exec);
         }
     } else {
-        if (hResult instanceof Fragment) {
+        if (isFragment(hResult)) {
             resolveChildren(entryPoint, hResult.children || []);
         } else {
-            entryPoint.appendChild(hResult);
+            entryPoint.appendChild(document.createTextNode(hResult?.toString() || ""));
         }
     }
 };
 
 export const h = <T>(
-    component: (new () => Fragment) | string | ((props?: T) => JSX.Element),
+    component: (new () => Fragment) | ((props?: T) => JSX.Element) | string,
     props: T | null,
-    ...children: JSX.RenderingChildren[]
-): () => HTMLElement | Fragment => {
-    return () => typeof component === "string"
-        ? createTag(component, props, children)
-        : isFragmentConstructor(component)
-            ? new Fragment(children)
-            : createComponent(component, props, children);
+    ...children: JSX.Element[]
+) => {
+    return () => {
+        if (typeof component === "string") {
+            return createTag(component, props, children);
+        }
+        if (isFragmentConstructor(component)) {
+            return new Fragment(children);
+        }
+        return createComponent(component, props, children);
+    };
 };
 
 if (typeof window !== undefined) {
