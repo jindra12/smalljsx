@@ -8,6 +8,7 @@ class Fragment {
 const isFragmentConstructor = (
     component: (new () => Fragment) | string | ((props?: any) => JSX.Element)
 ): component is new () => Fragment => component === Fragment;
+
 const isFragment = (
     component:
         | string
@@ -198,6 +199,29 @@ export const useMemo = <T>(value: () => T, deps: any[]) => {
     return nextValue;
 };
 
+export interface TreeContext<T> {
+    defaultValue: T;
+    id: string;
+}
+
+export const createTreeContext = <T>(defaultValue: T): TreeContext<T> => {
+    const context = {
+        defaultValue: defaultValue,
+        id: getUniqueId(),
+    };
+    return context;
+};
+
+export const useSetContext = <T>(treeContext: TreeContext<T>, nextState?: T) => {
+    const treeContexts = context.pointer.treeContext;
+    treeContexts[treeContext.id] = nextState || treeContext.defaultValue;
+};
+
+export const useContext = <T>(treeContext: TreeContext<T>) => {
+    const treeContexts = context.pointer.treeContext;
+    return treeContexts[treeContext.id] || treeContext.defaultValue;
+};
+
 export const useCallback = <T extends (...args: any[]) => any>(
     value: T,
     deps: any[]
@@ -228,6 +252,7 @@ type Stack = {
     new: boolean;
     parent?: Stack;
     hooks: HooksStack;
+    treeContext: Record<string, any>;
 };
 
 class Context {
@@ -239,6 +264,7 @@ class Context {
         updated: 1,
         new: false,
         hooks: new HooksStack(),
+        treeContext: {},
     };
     pointer: Stack;
     constructor() {
@@ -260,6 +286,9 @@ class Context {
                 new: true,
                 parent: this.pointer,
                 hooks: new HooksStack(),
+                treeContext: {
+                    ...this.pointer.treeContext,
+                },
             };
             this.pointer.children[nextStack.key] = nextStack;
             this.pointer.childrenCount++;
