@@ -184,7 +184,10 @@ export const createTreeContext = <T>(defaultValue: T): TreeContext<T> => {
     return context;
 };
 
-export const useSetContext = <T>(treeContext: TreeContext<T>, nextState?: T) => {
+export const useSetContext = <T>(
+    treeContext: TreeContext<T>,
+    nextState?: T
+) => {
     const treeContexts = context.pointer.treeContext;
     treeContexts[treeContext.id] = nextState || treeContext.defaultValue;
 };
@@ -224,7 +227,7 @@ type Stack = {
     new: boolean;
     parent?: Stack;
     hooks: HooksStack;
-    rendered?: (HTMLElement | Text);
+    rendered?: HTMLElement | Text;
     treeContext: Record<string, any>;
 };
 
@@ -239,6 +242,7 @@ class Context {
         hooks: new HooksStack(),
         treeContext: {},
     };
+    postUpdateActions: Array<() => void> = [];
     pointer: Stack;
     constructor() {
         this.pointer = this.root;
@@ -268,16 +272,21 @@ class Context {
             this.pointer = nextStack;
         }
     };
-    processJSXToHtml = (element: JSX.Element): (Text | HTMLElement) => {
+    processJSXToHtml = (
+        element: JSX.Element,
+        createFn: () => Text | HTMLElement
+    ): Text | HTMLElement => {
         const executed = typeof element === "function" ? element() : element;
-        return executed instanceof HTMLElement ? executed : document.createTextNode(executed?.toString() || "");
-    };
-    processJSXToHtmlCached = (element: JSX.Element): (Text | HTMLElement) => {
-        if (this.pointer.hooks.rerender || !this.pointer.rendered) {
-            this.pointer.rendered?.remove();
-            this.pointer.rendered = this.processJSXToHtml(element);
+        if (this.pointer.hooks.rerender) {
+            this.pointer.hooks.rerender = false;
+            this.postUpdateActions.push(() => {
+                this.pointer.rendered?.replaceWith(createFn());
+            });
         }
-        return this.pointer.rendered!;
+        return (this.pointer.rendered =
+            executed instanceof HTMLElement
+                ? executed
+                : document.createTextNode(executed?.toString() || ""));
     };
     endComponentStack = () => {
         let max = 0;
@@ -291,26 +300,25 @@ class Context {
                 child.new = false;
             } else if (child.updated < max) {
                 const unmountActions = child.hooks.unmountActions;
-                for (let i = 0; i < unmountActions.length; i++) {
-                    unmountActions[i]();
-                }
+                this.postUpdateActions.push(...unmountActions);
                 delete this.pointer.children[key];
             }
         }
         const postActions = this.pointer.hooks.postActions;
-        for (let i = 0; i < postActions.length; i++) {
-            postActions[i]();
-        }
+        this.postUpdateActions.push(...postActions);
         this.pointer.hooks.reset();
         this.pointer = this.pointer.parent!;
+
+        if (postActions.length > 0) {
+            const event = new CustomEvent("smalljsx-update");
+            document.dispatchEvent(event);
+        }
     };
 }
 
 let context = new Context();
 
-const executeChildren = (
-    children: JSX.Element[]
-) => {
+const executeChildren = (children: JSX.Element[]) => {
     const acc: JSX.ResolvedChildren[] = [];
     for (let i = 0; i < children.length; i++) {
         const child = children[i];
@@ -324,10 +332,7 @@ const executeChildren = (
     return acc;
 };
 
-const resolveChildren = (
-    htmlTag: HTMLElement,
-    children: JSX.Element[],
-) => {
+const resolveChildren = (htmlTag: HTMLElement, children: JSX.Element[]) => {
     const executed = executeChildren(children);
     for (let i = 0; i < executed.length; i++) {
         const child = executed[i];
@@ -371,20 +376,29 @@ const createComponent = <T>(
     component: (props?: T) => JSX.Element,
     props: T | null,
     children: JSX.Element[]
-): (HTMLElement | Text) => {
+): HTMLElement | Text => {
     const copiedProps = Object.assign({}, props || {}, {
         get children() {
             return executeChildren(children);
         },
     }) as any as T;
     context.startComponentStack(component, (copiedProps as any).key?.toString());
-    const htmlTag = context.processJSXToHtmlCached(component(copiedProps));
+    const htmlTag = context.processJSXToHtml(component(copiedProps), () =>
+        createComponent(component, props, children)
+    );
     context.endComponentStack();
     return htmlTag;
 };
 
-export const mount = (hResult: JSX.Element, mountPoint: string | HTMLElement, replace: boolean = true) => {
-    const entryPoint = typeof mountPoint === "string" ? document.querySelector<HTMLElement>(mountPoint) : mountPoint;
+export const mount = (
+    hResult: JSX.Element,
+    mountPoint: string | HTMLElement,
+    replace: boolean = true
+) => {
+    const entryPoint =
+        typeof mountPoint === "string"
+            ? document.querySelector<HTMLElement>(mountPoint)
+            : mountPoint;
     if (!entryPoint) {
         throw `Could not find element ${mountPoint}`;
     }
@@ -402,9 +416,30 @@ export const mount = (hResult: JSX.Element, mountPoint: string | HTMLElement, re
         if (isFragment(hResult)) {
             resolveChildren(entryPoint, hResult.children || []);
         } else {
-            entryPoint.appendChild(document.createTextNode(hResult?.toString() || ""));
+            entryPoint.appendChild(
+                document.createTextNode(hResult?.toString() || "")
+            );
         }
     }
+    const postUpdate = () => {
+        for (let i = 0; i < context.postUpdateActions.length; i++) {
+            context.postUpdateActions[i]();
+        }
+        context.postUpdateActions = [];
+    };
+    postUpdate();
+    let updateValue = 0;
+    const timeoutMs = 100;
+    addEventListener("smalljsx-update", () => {
+        updateValue += 1;
+        const myUpdate = updateValue;
+        setTimeout(() => {
+            if (updateValue === myUpdate) {
+                postUpdate();
+            }
+        }, timeoutMs);
+    });
+
 };
 
 export const h = <T>(
