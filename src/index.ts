@@ -218,6 +218,15 @@ export const useUnmountEffect = (effect: () => void) => {
     hooks.storeStack("unmount");
 };
 
+export const usePortal = (queryOrElement: string | HTMLElement, rewrite = false) => {
+    const hooks = context.pointer.hooks;
+    const normalized =
+        typeof queryOrElement === "string"
+            ? document.querySelector(queryOrElement)
+            : queryOrElement;
+    hooks.storeStack({ portal: normalized, rewrite: rewrite });
+};
+
 type Stack = {
     key: string;
     component: Function | string;
@@ -230,6 +239,8 @@ type Stack = {
     rendered?: HTMLElement | Text;
     treeContext: Record<string, any>;
 };
+
+const isPortal = (hook: any): hook is { portal: HTMLElement } => Boolean(hook.portal instanceof HTMLElement);
 
 class Context {
     root: Stack = {
@@ -280,7 +291,14 @@ class Context {
         if (this.pointer.hooks.rerender) {
             this.pointer.hooks.rerender = false;
             this.postUpdateActions.push(() => {
-                this.pointer.rendered?.replaceWith(createFn());
+                const portal = this.pointer.hooks.stored.find(isPortal);
+                if (portal) {
+                    portal.portal.innerHTML = "";
+                    portal.portal.appendChild(createFn());
+                    this.pointer.rendered = document.createTextNode("");
+                } else {
+                    this.pointer.rendered?.replaceWith(createFn());
+                }
             });
         }
         return (this.pointer.rendered =
@@ -439,7 +457,6 @@ export const mount = (
             }
         }, timeoutMs);
     });
-
 };
 
 export const h = <T>(
