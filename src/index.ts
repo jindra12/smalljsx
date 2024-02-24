@@ -34,7 +34,7 @@ class HooksStack {
     rerender = false;
 
     reset = () => {
-        if (this.index !== this.stored.length - 1) {
+        if (this.index !== this.stored.length) {
             throw `Conditional calls to hooks not allowed!`;
         }
         this.rerender = false;
