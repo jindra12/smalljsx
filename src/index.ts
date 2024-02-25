@@ -89,7 +89,7 @@ export const useState = <T>(
                 typeof nextValue === "function"
                     ? (nextValue as any)(currentState)
                     : nextValue;
-            hooks.updateStack(index, nextState, true);
+            hooks.updateStack(index, nextState, currentState !== nextState);
         },
     ];
 };
@@ -228,7 +228,10 @@ export const useUnmountEffect = (effect: () => void) => {
     hooks.storeStack("unmount");
 };
 
-export const usePortal = (queryOrElement: string | HTMLElement, rewrite = false) => {
+export const usePortal = (
+    queryOrElement: string | HTMLElement,
+    rewrite = false
+) => {
     const hooks = context.pointer.hooks;
     const normalized =
         typeof queryOrElement === "string"
@@ -242,6 +245,7 @@ type Stack = {
     component: Function | string;
     children: Record<string, Stack>;
     childrenCount: number;
+    toUpdateIndex: number;
     updated: number;
     new: boolean;
     parent?: Stack;
@@ -250,28 +254,52 @@ type Stack = {
     treeContext: Record<string, any>;
 };
 
-const isPortal = (hook: any): hook is { portal: HTMLElement } => Boolean(hook.portal instanceof HTMLElement);
+const isPortal = (hook: any): hook is { portal: HTMLElement } =>
+    Boolean(hook.portal instanceof HTMLElement);
 
 class Context {
     root: Stack = {
         key: "root",
         component: "root",
         children: {},
+        toUpdateIndex: 0,
         childrenCount: 0,
-        updated: 1,
+        updated: 0,
         new: false,
         hooks: new HooksStack(),
         treeContext: {},
     };
     postUpdateActions: Array<() => void> = [];
     pointer: Stack;
+    
+    private createUpdate = (stack: () => Stack, onRerender?: (stack: Stack) => () => void) => {
+        return () => {
+            if (onRerender) {
+                this.postUpdateActions.push(onRerender(stack()));
+                dispatchUpdate();
+            }
+        }
+    };
+    
     constructor() {
         this.pointer = this.root;
     }
-    startComponentStack = (component: Function | string, key?: string, onRerender?: () => void) => {
+    
+    startComponentStack = (
+        component: Function | string,
+        hasCorrectPointer: boolean,
+        key?: string,
+        onRerender?: (stack: Stack) => () => void
+    ) => {
+        if (hasCorrectPointer) {
+            const ptr = this.pointer;
+            this.pointer.hooks.onRerender = this.createUpdate(() => ptr, onRerender);
+            return;
+        }
         const previous =
-            this.pointer.children[key || this.pointer.childrenCount.toString() || ""];
+            this.pointer.children[key || this.pointer.toUpdateIndex];
         if (previous && previous.component === component) {
+            this.pointer.toUpdateIndex++;
             previous.updated++;
             this.pointer = previous;
         } else {
@@ -280,15 +308,11 @@ class Context {
                 children: {},
                 childrenCount: 0,
                 component: component,
+                toUpdateIndex: 0,
                 updated: 1,
                 new: true,
                 parent: this.pointer,
-                hooks: new HooksStack(() => {
-                    if (onRerender) {
-                        this.postUpdateActions.push(onRerender)
-                        dispatchUpdate();
-                    }
-                }),
+                hooks: new HooksStack(this.createUpdate(() => nextStack, onRerender)),
                 treeContext: {
                     ...this.pointer.treeContext,
                 },
@@ -298,14 +322,13 @@ class Context {
             this.pointer = nextStack;
         }
     };
-    processJSXToHtml = (
-        element: JSX.Element,
-    ): Text | HTMLElement => {
+    processJSXToHtml = (element: JSX.Element): Text | HTMLElement => {
         const executed = typeof element === "function" ? element() : element;
         const portal = this.pointer.hooks.stored.find(isPortal);
-        const toRender = executed instanceof HTMLElement
-            ? executed
-            : document.createTextNode(executed?.toString() || "");
+        const toRender =
+            executed instanceof HTMLElement
+                ? executed
+                : document.createTextNode(executed?.toString() || "");
         if (portal) {
             portal.portal.innerHTML = "";
             portal.portal.appendChild(toRender);
@@ -313,9 +336,13 @@ class Context {
         } else if (!this.pointer.rendered) {
             this.pointer.rendered = toRender;
         } else {
-            this.pointer.rendered.replaceWith(toRender);
+            this.pointer.rendered.parentElement!.replaceChild(
+                toRender,
+                this.pointer.rendered,
+            );
+            this.pointer.rendered = toRender;
         }
-        return toRender
+        return toRender;
     };
     endComponentStack = () => {
         let max = 0;
@@ -336,11 +363,25 @@ class Context {
         const postActions = this.pointer.hooks.postActions;
         this.postUpdateActions.push(...postActions);
         this.pointer.hooks.reset();
+        Object.values(this.pointer.children).forEach((child) => {
+            child.toUpdateIndex = 0;
+        });
         this.pointer = this.pointer.parent!;
 
         if (postActions.length > 0) {
             dispatchUpdate();
         }
+    };
+    debug = () => {
+        let stringTree = "";
+        Object.values(this.root.children).map((stack) => {
+            if (stack.rendered) {
+                stringTree += stack.rendered instanceof HTMLElement ? stack.rendered.outerHTML : stack.rendered.textContent;
+            } else {
+                stringTree += "unrendered";
+            }
+        });
+        return stringTree;
     };
 }
 
@@ -391,7 +432,7 @@ const createTag = <T>(
             }
         }
     }
-    context.startComponentStack(component, (props as any)?.key?.toString() || "");
+    context.startComponentStack(component, (props as any)?.key?.toString());
     resolveChildren(htmlTag, children);
     if ((props as any)?.ref) {
         (props as any).ref.current = htmlTag;
@@ -403,14 +444,23 @@ const createTag = <T>(
 const createComponent = <T>(
     component: (props?: T) => JSX.Element,
     props: T | null,
-    children: JSX.Element[]
+    children: JSX.Element[],
+    hasCorrectPointer = false,
 ): HTMLElement | Text => {
     const copiedProps = Object.assign({}, props || {}, {
         get children() {
             return executeChildren(children);
         },
     }) as any as T;
-    context.startComponentStack(component, (copiedProps as any).key?.toString(), () => createComponent(component, props, children));
+    context.startComponentStack(
+        component,
+        hasCorrectPointer,
+        (copiedProps as any).key?.toString(),
+        (stack) => () => {
+            context.pointer = stack;
+            return createComponent(component, props, children, true);
+        },
+    );
     const htmlTag = context.processJSXToHtml(component(copiedProps));
     context.endComponentStack();
     return htmlTag;

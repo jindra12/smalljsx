@@ -14,7 +14,9 @@ describe("Should update HTML structures with useState", () => {
             return (
                 <div>
                     State <div className="test">{state}</div>
-                    <button id="click" onclick={() => setState(state + 1)}>Update!</button>
+                    <button id="click" onclick={() => {
+                        setState(state + 1);
+                    }}>Update!</button>
                 </div>
             );
         };
@@ -24,8 +26,13 @@ describe("Should update HTML structures with useState", () => {
         jest.runAllTimers();
         expect($(".test").text()).toBe("2");
         $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("3");
         $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("4");
         $("#click")[0].click();
+        jest.runAllTimers();
         expect($(".test").text()).toBe("5");
     });
 });
