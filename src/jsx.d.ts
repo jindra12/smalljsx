@@ -1,9 +1,3 @@
-type ElementType<K extends keyof HTMLElementTagNameMap> = Partial<
-    Omit<
-        HTMLElementTagNameMap[K],
-        keyof ParentNode | BannedKeys | BannedKeysSpecific<K>
-    >
->;
 type BannedKeys =
     | "align"
     | "accessKey"
@@ -297,6 +291,12 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     : never;
 
 declare namespace JSX {
+    type ElementType<K extends keyof HTMLElementTagNameMap> = Partial<
+        Omit<
+            HTMLElementTagNameMap[K],
+            keyof ParentNode | BannedKeys | BannedKeysSpecific<K>
+        >
+    >;
     type IntrinsicElements = {
         [K in keyof HTMLElementTagNameMap]: (ElementType<K> & {
             children?: Element | Element[];

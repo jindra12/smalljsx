@@ -14,4 +14,9 @@ describe("Should show basic HTML structures correctly", () => {
         mount(<div className="one">I can't believe this is not React!</div>, "#root");
         expect($(".one").text()).toBe("I can't believe this is not React!");
     });
+    it("Renders a table", () => {
+        mount(<table><th><td>Heading</td></th><tr><td>Cell</td></tr></table>, "#root");
+        expect($("table > th > td").text()).toEqual("Heading");
+        expect($("table > tr > td").text()).toEqual("Cell");
+    })
 });

@@ -1,3 +1,8 @@
+const dispatchUpdate = () => {
+    const event = new CustomEvent("smalljsx-update");
+    document.dispatchEvent(event);
+};
+
 class Fragment {
     children?: JSX.Element[];
     constructor(children?: JSX.Element[]) {
@@ -31,13 +36,16 @@ class HooksStack {
     postActions: Array<() => void> = [];
     unmountActions: Array<() => void> = [];
     index = 0;
-    rerender = false;
+    onRerender?: () => void;
+
+    constructor(onRerender?: () => void) {
+        this.onRerender = onRerender;
+    }
 
     reset = () => {
         if (this.index !== this.stored.length) {
             throw `Conditional calls to hooks not allowed!`;
         }
-        this.rerender = false;
         this.postActions = [];
         this.index = 0;
     };
@@ -53,7 +61,9 @@ class HooksStack {
 
     updateStack = (index: number, state: any, rerender: boolean) => {
         this.stored[index] = state;
-        this.rerender = rerender;
+        if (rerender) {
+            this.onRerender?.();
+        }
     };
 
     hasStack = () => this.index < this.stored.length;
@@ -78,7 +88,7 @@ export const useState = <T>(
             const nextState =
                 typeof nextValue === "function"
                     ? (nextValue as any)(currentState)
-                    : currentState;
+                    : nextValue;
             hooks.updateStack(index, nextState, true);
         },
     ];
@@ -258,7 +268,7 @@ class Context {
     constructor() {
         this.pointer = this.root;
     }
-    startComponentStack = (component: Function | string, key?: string) => {
+    startComponentStack = (component: Function | string, key?: string, onRerender?: () => void) => {
         const previous =
             this.pointer.children[key || this.pointer.childrenCount.toString() || ""];
         if (previous && previous.component === component) {
@@ -273,7 +283,12 @@ class Context {
                 updated: 1,
                 new: true,
                 parent: this.pointer,
-                hooks: new HooksStack(),
+                hooks: new HooksStack(() => {
+                    if (onRerender) {
+                        this.postUpdateActions.push(onRerender)
+                        dispatchUpdate();
+                    }
+                }),
                 treeContext: {
                     ...this.pointer.treeContext,
                 },
@@ -285,26 +300,22 @@ class Context {
     };
     processJSXToHtml = (
         element: JSX.Element,
-        createFn: () => Text | HTMLElement
     ): Text | HTMLElement => {
         const executed = typeof element === "function" ? element() : element;
-        if (this.pointer.hooks.rerender) {
-            this.pointer.hooks.rerender = false;
-            this.postUpdateActions.push(() => {
-                const portal = this.pointer.hooks.stored.find(isPortal);
-                if (portal) {
-                    portal.portal.innerHTML = "";
-                    portal.portal.appendChild(createFn());
-                    this.pointer.rendered = document.createTextNode("");
-                } else {
-                    this.pointer.rendered?.replaceWith(createFn());
-                }
-            });
+        const portal = this.pointer.hooks.stored.find(isPortal);
+        const toRender = executed instanceof HTMLElement
+            ? executed
+            : document.createTextNode(executed?.toString() || "");
+        if (portal) {
+            portal.portal.innerHTML = "";
+            portal.portal.appendChild(toRender);
+            this.pointer.rendered = document.createTextNode("");
+        } else if (!this.pointer.rendered) {
+            this.pointer.rendered = toRender;
+        } else {
+            this.pointer.rendered.replaceWith(toRender);
         }
-        return (this.pointer.rendered =
-            executed instanceof HTMLElement
-                ? executed
-                : document.createTextNode(executed?.toString() || ""));
+        return toRender
     };
     endComponentStack = () => {
         let max = 0;
@@ -328,8 +339,7 @@ class Context {
         this.pointer = this.pointer.parent!;
 
         if (postActions.length > 0) {
-            const event = new CustomEvent("smalljsx-update");
-            document.dispatchEvent(event);
+            dispatchUpdate();
         }
     };
 }
@@ -371,7 +381,7 @@ const createTag = <T>(
     for (const key in props || {}) {
         if (key !== "ref" && key !== "key") {
             if (key.startsWith("on")) {
-                htmlTag.addEventListener(key, (props as any)[key]);
+                htmlTag.addEventListener(key.slice(2), (props as any)[key]);
             } else {
                 try {
                     (htmlTag as any)[key] = (props as any)[key];
@@ -381,7 +391,7 @@ const createTag = <T>(
             }
         }
     }
-    context.startComponentStack(component, (props as any).key?.toString() || "");
+    context.startComponentStack(component, (props as any)?.key?.toString() || "");
     resolveChildren(htmlTag, children);
     if ((props as any)?.ref) {
         (props as any).ref.current = htmlTag;
@@ -400,10 +410,8 @@ const createComponent = <T>(
             return executeChildren(children);
         },
     }) as any as T;
-    context.startComponentStack(component, (copiedProps as any).key?.toString());
-    const htmlTag = context.processJSXToHtml(component(copiedProps), () =>
-        createComponent(component, props, children)
-    );
+    context.startComponentStack(component, (copiedProps as any).key?.toString(), () => createComponent(component, props, children));
+    const htmlTag = context.processJSXToHtml(component(copiedProps));
     context.endComponentStack();
     return htmlTag;
 };
@@ -447,13 +455,17 @@ export const mount = (
     };
     postUpdate();
     let updateValue = 0;
-    const timeoutMs = 100;
-    addEventListener("smalljsx-update", () => {
+    const timeoutMs = 20;
+    document.addEventListener("smalljsx-update", () => {
         updateValue += 1;
         const myUpdate = updateValue;
-        setTimeout(() => {
+        window.setTimeout(() => {
+            if (updateValue > 5000) {
+                throw `Too deep update recursion, over 5000 updates occured, fix your app!`;
+            }
             if (updateValue === myUpdate) {
                 postUpdate();
+                updateValue = 0;
             }
         }, timeoutMs);
     });
