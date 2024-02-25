@@ -35,4 +35,34 @@ describe("Should update HTML structures with useState", () => {
         jest.runAllTimers();
         expect($(".test").text()).toBe("5");
     });
+    it("Can pass state to child component", () => {
+        const Stateful: Component = () => {
+            const [state, setState] = useState(1);
+            return <Display setState={setState} state={state} />
+        };
+        const Display: Component<{state: number, setState: (value: number) => void}> = (props) => {
+            return (
+                <div>
+                    State <div className="test">{props.state}</div>
+                    <button id="click" onclick={() => {
+                        props.setState(props.state + 1);
+                    }}>Update!</button>
+                </div>
+            );
+        };
+        mount(<Stateful />, "#root");
+        expect($(".test").text()).toBe("1");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("2");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("3");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("4");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("5");
+    });
 });

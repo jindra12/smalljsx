@@ -333,16 +333,10 @@ class Context {
             portal.portal.innerHTML = "";
             portal.portal.appendChild(toRender);
             this.pointer.rendered = document.createTextNode("");
-        } else if (!this.pointer.rendered) {
-            this.pointer.rendered = toRender;
         } else {
-            this.pointer.rendered.parentElement!.replaceChild(
-                toRender,
-                this.pointer.rendered,
-            );
             this.pointer.rendered = toRender;
         }
-        return toRender;
+        return this.pointer.rendered!;
     };
     endComponentStack = () => {
         let max = 0;
@@ -458,7 +452,12 @@ const createComponent = <T>(
         (copiedProps as any).key?.toString(),
         (stack) => () => {
             context.pointer = stack;
-            return createComponent(component, props, children, true);
+            const original = stack.rendered;
+            const next = createComponent(component, props, children, true);
+            original!.parentElement!.replaceChild(
+                next,
+                original!
+            );
         },
     );
     const htmlTag = context.processJSXToHtml(component(copiedProps));
