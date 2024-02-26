@@ -250,6 +250,8 @@ type Stack = {
     new: boolean;
     parent?: Stack;
     hooks: HooksStack;
+    props: any,
+    rawChildren: JSX.Element[],
     rendered?: HTMLElement | Text;
     treeContext: Record<string, any>;
 };
@@ -258,20 +260,26 @@ const isPortal = (hook: any): hook is { portal: HTMLElement } =>
     Boolean(hook.portal instanceof HTMLElement);
 
 class Context {
-    root: Stack = {
-        key: "root",
-        component: "root",
-        children: {},
-        toUpdateIndex: 0,
-        childrenCount: 0,
-        updated: 0,
-        new: false,
-        hooks: new HooksStack(),
-        treeContext: {},
-    };
+    root: Stack = Context.createRoot();
     postUpdateActions: Array<() => void> = [];
     pointer: Stack;
     
+    private static createRoot = (): Stack => {
+        return {
+            key: "root",
+            component: "root",
+            props: {},
+            rawChildren: [],
+            children: {},
+            toUpdateIndex: 0,
+            childrenCount: 0,
+            updated: 0,
+            new: false,
+            hooks: new HooksStack(),
+            treeContext: {},
+        };
+    }
+
     private createUpdate = (stack: () => Stack, onRerender?: (stack: Stack) => () => void) => {
         return () => {
             if (onRerender) {
@@ -285,8 +293,10 @@ class Context {
         this.pointer = this.root;
     }
     
-    startComponentStack = (
+    startComponentStack = <T>(
         component: Function | string,
+        props: T | null,
+        children: JSX.Element[],
         hasCorrectPointer: boolean,
         key?: string,
         onRerender?: (stack: Stack) => () => void
@@ -302,6 +312,8 @@ class Context {
             this.pointer.toUpdateIndex++;
             previous.updated++;
             this.pointer = previous;
+            this.pointer.props = props;
+            this.pointer.rawChildren = children;
         } else {
             const nextStack: Stack = {
                 key: key || this.pointer.childrenCount.toString() || "",
@@ -309,6 +321,8 @@ class Context {
                 childrenCount: 0,
                 component: component,
                 toUpdateIndex: 0,
+                props: props,
+                rawChildren: children,
                 updated: 1,
                 new: true,
                 parent: this.pointer,
@@ -332,11 +346,16 @@ class Context {
         if (portal) {
             portal.portal.innerHTML = "";
             portal.portal.appendChild(toRender);
-            this.pointer.rendered = document.createTextNode("");
-        } else {
+            const placeholder = document.createTextNode("");
+            if (!this.pointer.rendered) {
+                this.pointer.rendered = placeholder;
+            }
+            return placeholder;
+        }
+        if (!this.pointer.rendered) {
             this.pointer.rendered = toRender;
         }
-        return this.pointer.rendered!;
+        return toRender;
     };
     endComponentStack = () => {
         let max = 0;
@@ -357,29 +376,23 @@ class Context {
         const postActions = this.pointer.hooks.postActions;
         this.postUpdateActions.push(...postActions);
         this.pointer.hooks.reset();
-        Object.values(this.pointer.children).forEach((child) => {
-            child.toUpdateIndex = 0;
-        });
+        this.pointer.toUpdateIndex = 0;
         this.pointer = this.pointer.parent!;
 
         if (postActions.length > 0) {
             dispatchUpdate();
         }
     };
-    debug = () => {
-        let stringTree = "";
-        Object.values(this.root.children).map((stack) => {
-            if (stack.rendered) {
-                stringTree += stack.rendered instanceof HTMLElement ? stack.rendered.outerHTML : stack.rendered.textContent;
-            } else {
-                stringTree += "unrendered";
-            }
-        });
-        return stringTree;
+    reset = () => {
+        this.root = Context.createRoot();
+        this.pointer = this.root;
+        this.postUpdateActions = [];
     };
 }
 
 let context = new Context();
+
+export const __reset = () => context.reset();
 
 const executeChildren = (children: JSX.Element[]) => {
     const acc: JSX.ResolvedChildren[] = [];
@@ -426,7 +439,7 @@ const createTag = <T>(
             }
         }
     }
-    context.startComponentStack(component, (props as any)?.key?.toString());
+    context.startComponentStack(component, props, children, (props as any)?.key?.toString());
     resolveChildren(htmlTag, children);
     if ((props as any)?.ref) {
         (props as any).ref.current = htmlTag;
@@ -448,16 +461,20 @@ const createComponent = <T>(
     }) as any as T;
     context.startComponentStack(
         component,
+        props,
+        children,
         hasCorrectPointer,
         (copiedProps as any).key?.toString(),
         (stack) => () => {
             context.pointer = stack;
             const original = stack.rendered;
-            const next = createComponent(component, props, children, true);
-            original!.parentElement!.replaceChild(
+            const next = createComponent(component, context.pointer.props, context.pointer.rawChildren, true);
+            original?.parentElement?.replaceChild(
                 next,
                 original!
             );
+            stack.rendered = next;
+            return;
         },
     );
     const htmlTag = context.processJSXToHtml(component(copiedProps));
