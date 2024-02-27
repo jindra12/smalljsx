@@ -10,16 +10,21 @@ describe("Should update HTML structures with useState", () => {
     });
     afterEach(() => {
         __reset();
-    })
+    });
     it("Can use state and a button to update div content", () => {
         const TestComponent: Component = () => {
             const [state, setState] = useState(1);
             return (
                 <div>
                     State <div className="test">{state}</div>
-                    <button id="click" onclick={() => {
-                        setState(state + 1);
-                    }}>Update!</button>
+                    <button
+                        id="click"
+                        onclick={() => {
+                            setState(state + 1);
+                        }}
+                    >
+                        Update!
+                    </button>
                 </div>
             );
         };
@@ -41,15 +46,23 @@ describe("Should update HTML structures with useState", () => {
     it("Can pass state to child component", () => {
         const Stateful: Component = () => {
             const [state, setState] = useState(1);
-            return <Display setState={setState} state={state} />
+            return <Display setState={setState} state={state} />;
         };
-        const Display: Component<{state: number, setState: (value: number) => void}> = (props) => {
+        const Display: Component<{
+            state: number;
+            setState: (value: number) => void;
+        }> = (props) => {
             return (
                 <div>
                     State <div className="test">{props.state}</div>
-                    <button id="click" onclick={() => {
-                        props.setState(props.state + 1);
-                    }}>Update!</button>
+                    <button
+                        id="click"
+                        onclick={() => {
+                            props.setState(props.state + 1);
+                        }}
+                    >
+                        Update!
+                    </button>
                 </div>
             );
         };
@@ -74,11 +87,19 @@ describe("Should update HTML structures with useState", () => {
             const [multiplicative, setMultiplicative] = useState(1);
             return (
                 <div>
-                    State <div className="test">{additive} + {multiplicative}</div>
-                    <button id="click" onclick={() => {
-                        setAdditive(additive + 1);
-                        setMultiplicative(multiplicative * 2);
-                    }}>Update!</button>
+                    State{" "}
+                    <div className="test">
+                        {additive} + {multiplicative}
+                    </div>
+                    <button
+                        id="click"
+                        onclick={() => {
+                            setAdditive(additive + 1);
+                            setMultiplicative(multiplicative * 2);
+                        }}
+                    >
+                        Update!
+                    </button>
                 </div>
             );
         };
@@ -100,17 +121,28 @@ describe("Should update HTML structures with useState", () => {
     it("Can handle state updates across multiple components", () => {
         const Additive: Component = () => {
             const [additive, setAdditive] = useState(1);
-            return <Multiplicative setAdditive={setAdditive} additive={additive} />
+            return <Multiplicative setAdditive={setAdditive} additive={additive} />;
         };
-        const Multiplicative: Component<{additive: number, setAdditive: (value: number) => void}> = (props) => {
+        const Multiplicative: Component<{
+            additive: number;
+            setAdditive: (value: number) => void;
+        }> = (props) => {
             const [multiplicative, setMultiplicative] = useState(1);
             return (
                 <div>
-                    State <div className="test">{props.additive} + {multiplicative}</div>
-                    <button id="click" onclick={() => {
-                        props.setAdditive(props.additive + 1);
-                        setMultiplicative(multiplicative * 2);
-                    }}>Update!</button>
+                    State{" "}
+                    <div className="test">
+                        {props.additive} + {multiplicative}
+                    </div>
+                    <button
+                        id="click"
+                        onclick={() => {
+                            props.setAdditive(props.additive + 1);
+                            setMultiplicative(multiplicative * 2);
+                        }}
+                    >
+                        Update!
+                    </button>
                 </div>
             );
         };
@@ -128,5 +160,93 @@ describe("Should update HTML structures with useState", () => {
         $("#click")[0].click();
         jest.runAllTimers();
         expect($(".test").text()).toBe("5 + 16");
+    });
+    it("Can handle state updates in components rendering content separately", () => {
+        const Additive: Component = () => {
+            const [additive, setAdditive] = useState(1);
+            return (
+                <div className="additive-test">
+                    <div>{additive}</div>
+                    <button
+                        id="additive-click"
+                        onclick={() => {
+                            setAdditive(additive + 1);
+                        }}
+                    >
+                        Update!
+                    </button>
+                    <Multiplicative />
+                </div>
+            );
+        };
+        const Multiplicative: Component = () => {
+            const [multiplicative, setMultiplicative] = useState(1);
+            return (
+                <div className="multiplicative-test">
+                    <div>{multiplicative}</div>
+                    <button
+                        id="multiplicative-click"
+                        onclick={() => {
+                            setMultiplicative(multiplicative * 2);
+                        }}
+                    >
+                        Update!
+                    </button>
+                </div>
+            );
+        };
+        mount(<Additive />, "#root");
+        expect($(".additive-test > div:first-child").text()).toBe("1");
+        expect($(".multiplicative-test > div:first-child").text()).toBe("1");
+        $("#additive-click")[0].click();
+        $("#multiplicative-click")[0].click();
+        jest.runAllTimers();
+        expect($(".additive-test > div:first-child").text()).toBe("2");
+        expect($(".multiplicative-test > div:first-child").text()).toBe("2");
+        $("#additive-click")[0].click();
+        $("#multiplicative-click")[0].click();
+        jest.runAllTimers();
+        expect($(".additive-test > div:first-child").text()).toBe("3");
+        expect($(".multiplicative-test > div:first-child").text()).toBe("4");
+        $("#additive-click")[0].click();
+        $("#multiplicative-click")[0].click();
+        jest.runAllTimers();
+        expect($(".additive-test > div:first-child").text()).toBe("4");
+        expect($(".multiplicative-test > div:first-child").text()).toBe("8");
+        $("#additive-click")[0].click();
+        $("#multiplicative-click")[0].click();
+        jest.runAllTimers();
+    });
+    it("Can update through update functions", () => {
+        const TestComponent: Component = () => {
+            const [state, setState] = useState(() => 1);
+            return (
+                <div>
+                    State <div className="test">{state}</div>
+                    <button
+                        id="click"
+                        onclick={() => {
+                            setState(state => state + 1);
+                        }}
+                    >
+                        Update!
+                    </button>
+                </div>
+            );
+        };
+        mount(<TestComponent />, "#root");
+        expect($(".test").text()).toBe("1");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("2");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("3");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("4");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("5");
     });
 });
