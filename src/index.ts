@@ -94,7 +94,7 @@ export const useState = <T>(
     ];
 };
 
-export const useRef = <T>(initialRef?: T | (() => T)): { current: T } => {
+export const useRef = <T>(initialRef?: T | (() => T)): { current: T | undefined } => {
     const hooks = context.pointer.hooks;
     const index = hooks.index;
     const currentRef = hooks.hasStack()
@@ -105,13 +105,15 @@ export const useRef = <T>(initialRef?: T | (() => T)): { current: T } => {
     hooks.storeStack(currentRef);
     return {
         get current() {
-            return currentRef;
+            return hooks.stored[index];
         },
         set current(value: T) {
             hooks.updateStack(index, value, false);
         },
     };
 };
+
+export type Ref<T> = { current?: T };
 
 const getHasChangedDeps = (
     deps: any[],
