@@ -71,7 +71,14 @@ class HooksStack {
     peekStack = () => this.stored[this.index];
 }
 
-export const useState = <T>(
+interface StateHelper {
+    useState<T>(initialState: T | (() => T)): [T, (value: T | ((prevValue: T) => T)) => void];
+    useState<T>(): [T | undefined, (value: T | ((prevValue: T) => T)) => void];
+}
+
+type StateFn = StateHelper["useState"];
+
+export const useState: StateFn = <T>(
     initialState?: T | (() => T)
 ): [T, (value: T | ((prevValue: T) => T)) => void] => {
     const hooks = context.pointer.hooks;
@@ -94,7 +101,14 @@ export const useState = <T>(
     ];
 };
 
-export const useRef = <T>(initialRef?: T | (() => T)): { current: T | undefined } => {
+interface RefHelper {
+    useRef<T>(): { current: T | undefined };
+    useRef<T>(initialRef: T | (() => T) | undefined): { current: T };
+}
+
+type RefFn = RefHelper["useRef"];
+
+export const useRef: RefFn = <T>(initialRef?: T | (() => T) | undefined): { current: T | undefined } => {
     const hooks = context.pointer.hooks;
     const index = hooks.index;
     const currentRef = hooks.hasStack()
@@ -113,7 +127,7 @@ export const useRef = <T>(initialRef?: T | (() => T)): { current: T | undefined 
     };
 };
 
-export type Ref<T> = { current?: T };
+export type Ref<T> = { current: T };
 
 const getHasChangedDeps = (
     deps: any[],

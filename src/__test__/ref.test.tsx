@@ -77,7 +77,7 @@ describe("Can use ref to get rendered layout", () => {
     it("Can pass ref through another component", () => {
         let refContents: HTMLTableElement | undefined = undefined;
         const Table: Component<{
-            ref: Ref<HTMLTableElement>;
+            ref: Ref<HTMLTableElement | undefined>;
             state: number;
             setState: (value: number) => void;
         }> = (props) => {
