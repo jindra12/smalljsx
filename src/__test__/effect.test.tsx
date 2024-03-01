@@ -8,8 +8,8 @@ import {
     useRef,
     useEachRenderEffect,
     useUnmountEffect,
+    Component,
 } from "../index";
-import { Component } from "../types";
 jest.useFakeTimers();
 
 describe("Can use before/after render effects", () => {

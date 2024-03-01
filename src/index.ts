@@ -3,6 +3,9 @@ const dispatchUpdate = () => {
     document.dispatchEvent(event);
 };
 
+export type Component<T extends object = {}> = (props: T & { children?: never }) => JSX.Element;
+export type ParentComponent<T extends object = {}> = (props: T & { children?: JSX.Element }) => JSX.Element;
+
 class Fragment {
     children?: JSX.Element[];
     constructor(children?: JSX.Element[]) {

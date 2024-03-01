@@ -1,7 +1,6 @@
 // import preview from "jest-preview";
 import $ from "jquery";
-import { mount, useState, __reset } from "../index";
-import { Component } from "../types";
+import { mount, useState, __reset, Component } from "../index";
 jest.useFakeTimers();
 
 describe("Should update HTML structures with useState", () => {

@@ -1,6 +1,5 @@
 import $ from "jquery";
-import { mount,  __reset, useMemo, useState } from "../index";
-import { Component } from "../types";
+import { mount,  __reset, useMemo, useState, Component, useCallback } from "../index";
 jest.useFakeTimers();
 
 describe("Should cache and update information with useMemo", () => {
@@ -171,5 +170,22 @@ describe("Should cache and update information with useMemo", () => {
         jest.runAllTimers();
         expect($(".test").text()).toBe("4 + 8");
         expect(called).toEqual(4);
+    });
+    it("Can use useCallback", () => {
+        const testRefs: Array<() => number> = [];
+        const TestComponent = () => {
+            const [state, setState] = useState(0);
+            const callback = useCallback(() => {
+                return 1;
+            }, []);
+            testRefs.push(callback);
+            return <button id="click" onclick={() => setState(state + 1)}>{state}</button>;
+        };
+        mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(testRefs).toHaveLength(2);
+        expect(testRefs.every((t) => testRefs[0] === t)).toBeTruthy();
     });
 });
