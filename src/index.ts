@@ -263,7 +263,6 @@ type Stack = {
     childrenCount: number;
     toUpdateIndex: number;
     updated: number;
-    new: boolean;
     parent?: Stack;
     hooks: HooksStack;
     props: any,
@@ -290,7 +289,6 @@ class Context {
             toUpdateIndex: 0,
             childrenCount: 0,
             updated: 0,
-            new: false,
             hooks: new HooksStack(),
             treeContext: {},
         };
@@ -320,6 +318,7 @@ class Context {
         if (hasCorrectPointer) {
             const ptr = this.pointer;
             this.pointer.hooks.onRerender = this.createUpdate(() => ptr, onRerender);
+            this.pointer.updated++;
             return;
         }
         const previous =
@@ -340,7 +339,6 @@ class Context {
                 props: props,
                 rawChildren: children,
                 updated: 1,
-                new: true,
                 parent: this.pointer,
                 hooks: new HooksStack(this.createUpdate(() => nextStack, onRerender)),
                 treeContext: {
@@ -374,16 +372,9 @@ class Context {
         return toRender;
     };
     endComponentStack = () => {
-        let max = 0;
         for (const key in this.pointer.children) {
             const child = this.pointer.children[key];
-            max = Math.max(max, child.updated);
-        }
-        for (const key in this.pointer.children) {
-            const child = this.pointer.children[key];
-            if (child.new) {
-                child.new = false;
-            } else if (child.updated < max) {
+            if (child.updated < this.pointer.updated) {
                 const unmountActions = child.hooks.unmountActions;
                 this.postUpdateActions.push(...unmountActions);
                 delete this.pointer.children[key];

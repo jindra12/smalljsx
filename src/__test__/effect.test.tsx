@@ -48,7 +48,7 @@ describe("Can use before/after render effects", () => {
             useEffect(
                 () => {
                     called++;
-                    beforeRenderContents = ref.current?.innerText || "";
+                    beforeRenderContents = ref.current?.innerHTML || "";
                 },
                 "before-render",
                 [state]
@@ -69,14 +69,14 @@ describe("Can use before/after render effects", () => {
     });
     it("Can use after render effect", () => {
         let called = 0;
-        let beforeRenderContents = "";
+        let afterRenderContents = "";
         const TestComponent: Component = () => {
             const [state, setState] = useState(0);
             const ref = useRef<HTMLButtonElement>();
             useEffect(
                 () => {
                     called++;
-                    beforeRenderContents = ref.current?.innerText || "";
+                    afterRenderContents = ref.current?.innerHTML || "";
                 },
                 "after-render",
                 [state]
@@ -93,7 +93,7 @@ describe("Can use before/after render effects", () => {
         $("#click")[0].click();
         jest.runAllTimers();
         expect(called).toBe(2);
-        expect(beforeRenderContents).toEqual("1");
+        expect(afterRenderContents).toEqual("1");
     });
     it("Can use each state update before effect", () => {
         let called = 0;
@@ -103,7 +103,7 @@ describe("Can use before/after render effects", () => {
             const ref = useRef<HTMLButtonElement>();
             useEachRenderEffect(() => {
                 called++;
-                beforeRenderContents = ref.current?.innerText || "";
+                beforeRenderContents = ref.current?.innerHTML || "";
             }, "before-render");
             return (
                 <button ref={ref} id="click" onclick={() => setState(state + 1)}>
@@ -127,7 +127,7 @@ describe("Can use before/after render effects", () => {
             const ref = useRef<HTMLButtonElement>();
             useEachRenderEffect(() => {
                 called++;
-                beforeRenderContents = ref.current?.innerText || "";
+                beforeRenderContents = ref.current?.innerHTML || "";
             }, "after-render");
             return (
                 <button ref={ref} id="click" onclick={() => setState(state + 1)}>
@@ -141,7 +141,7 @@ describe("Can use before/after render effects", () => {
         $("#click")[0].click();
         jest.runAllTimers();
         expect(called).toBe(2);
-        expect(beforeRenderContents).toEqual("0");
+        expect(beforeRenderContents).toEqual("1");
     });
     it("Can use unmount effect", () => {
         let called = 0;
@@ -169,7 +169,7 @@ describe("Can use before/after render effects", () => {
                 <div className="test" ref={ref}>
                     {state < 2 ? (
                         <Unmountable
-                            onUnmount={() => (unmountContents = ref.current?.innerText || "")}
+                            onUnmount={() => (unmountContents = ref.current?.innerHTML || "")}
                         />
                     ) : null}
                     {state}
@@ -180,7 +180,8 @@ describe("Can use before/after render effects", () => {
         jest.runAllTimers();
         jest.runAllTimers();
         jest.runAllTimers();
+        jest.runAllTimers();
         expect(called).toEqual(1);
-        expect(unmountContents).toEqual("3");
+        expect(unmountContents).toEqual("2");
     });
 });
