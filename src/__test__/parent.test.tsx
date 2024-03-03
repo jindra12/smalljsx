@@ -83,7 +83,268 @@ describe("Can use children/parent components and custom children types", () => {
         jest.runAllTimers();
         expect($("#click > div")[0].innerHTML).toEqual("2");
     });
-    it("Can use state updates correctly", () => { });
-    it("Can use before render effects correctly", () => { });
-    it("Can use after effects correctly", () => { });
+    it("Can use state updates correctly", () => {
+        const Parent: Small.ParentComponent = (props) => {
+            const [showChildren, setShowChildren] = Small.useState(true);
+            return (
+                <div>
+                    <button id="click" onclick={() => setShowChildren(!showChildren)}>
+                        Erase children
+                    </button>
+                    {showChildren ? props.children : null}
+                </div>
+            );
+        };
+        const ToUpdate = () => {
+            const [state, setState] = Small.useState(1);
+            return <button id="child" onclick={() => setState(state + 1)}>{state}</button>;
+        };
+        const Component: Small.Component = () => {
+            return (
+                <Parent>
+                    <ToUpdate />
+                </Parent>
+            );
+        };
+        Small.mount(<Component />, "#root");
+        jest.runAllTimers();
+        expect($("#child")[0].innerHTML).toEqual("1");
+        $("#child")[0].click();
+        jest.runAllTimers();
+        expect($("#child")[0].innerHTML).toEqual("2");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#child").length).toEqual(0);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#child").length).toEqual(1);
+        expect($("#child")[0].innerHTML).toEqual("1");
+        $("#child")[0].click();
+        jest.runAllTimers();
+        expect($("#child")[0].innerHTML).toEqual("2");
+    });
+    it("Can use before render effects correctly", () => {
+        let called = 0;
+        let beforeRenderContents = "";
+        const Parent: Small.ParentComponent = (props) => {
+            return <div>{props.children}</div>
+        };
+        const Stateful: Small.Component = () => {
+            const [state, setState] = Small.useState(0);
+            const ref = Small.useRef<HTMLButtonElement>();
+            Small.useEffect(
+                () => {
+                    called++;
+                    beforeRenderContents = ref.current?.innerHTML || "";
+                },
+                "before-render",
+                [state]
+            );
+            return (
+                <button ref={ref} id="click" onclick={() => setState(state + 1)}>
+                    {state}
+                </button>
+            );
+        };
+        const TestComponent = () => (
+            <Parent>
+                <Stateful />
+            </Parent>
+        );
+        Small.mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        expect(called).toBe(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toBe(2);
+        expect(beforeRenderContents).toEqual("0");
+    });
+    it("Can use before render effects correctly with props in children", () => {
+        let called = 0;
+        let beforeRenderContents = "";
+        const Parent: Small.ParentComponent = (props) => {
+            return <div>{props.children}</div>
+        };
+        const Stateful: Small.Component<{ state: number, setState: (value: number) => void }> = (props) => {
+            const ref = Small.useRef<HTMLButtonElement>();
+            Small.useEffect(
+                () => {
+                    called++;
+                    beforeRenderContents = ref.current?.innerHTML || "";
+                },
+                "before-render",
+                [props.state]
+            );
+            return (
+                <button ref={ref} id="click" onclick={() => props.setState(props.state + 1)}>
+                    {props.state}
+                </button>
+            );
+        };
+        const TestComponent = () => {
+            const [state, setState] = Small.useState(0);
+            return (
+                <Parent>
+                    <Stateful setState={setState} state={state} />
+                </Parent>
+            );
+        };
+        Small.mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        expect(called).toBe(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toBe(2);
+        expect(beforeRenderContents).toEqual("0");
+    });
+    it("Can use before render effects correctly with function as children", () => {
+        let called = 0;
+        let beforeRenderContents = "";
+        const Parent: Small.Component<{ children: (state: number, setState: (value: number) => void) => JSX.Element }> = (props) => {
+            const [state, setState] = Small.useState(0);
+            return <div>{props.children(state, setState)}</div>
+        };
+        const Stateful: Small.Component<{ state: number, setState: (value: number) => void }> = (props) => {
+            const ref = Small.useRef<HTMLButtonElement>();
+            Small.useEffect(
+                () => {
+                    called++;
+                    beforeRenderContents = ref.current?.innerHTML || "";
+                },
+                "before-render",
+                [props.state]
+            );
+            return (
+                <button ref={ref} id="click" onclick={() => props.setState(props.state + 1)}>
+                    {props.state}
+                </button>
+            );
+        };
+        const TestComponent = () => {
+            return (
+                <Parent>
+                    {(state, setState) => <Stateful setState={setState} state={state} />}
+                </Parent>
+            );
+        };
+        Small.mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        expect(called).toBe(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toBe(2);
+        expect(beforeRenderContents).toEqual("0");
+    });
+    it("Can use after render effects correctly", () => {
+        let called = 0;
+        let afterRenderContents = "";
+        const Parent: Small.ParentComponent = (props) => {
+            return <div>{props.children}</div>
+        };
+        const Stateful: Small.Component = () => {
+            const [state, setState] = Small.useState(0);
+            const ref = Small.useRef<HTMLButtonElement>();
+            Small.useEffect(
+                () => {
+                    called++;
+                    afterRenderContents = ref.current?.innerHTML || "";
+                },
+                "after-render",
+                [state]
+            );
+            return (
+                <button ref={ref} id="click" onclick={() => setState(state + 1)}>
+                    {state}
+                </button>
+            );
+        };
+        const TestComponent = () => (
+            <Parent>
+                <Stateful />
+            </Parent>
+        );
+        Small.mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        expect(called).toBe(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toBe(2);
+        expect(afterRenderContents).toEqual("1");
+    });
+    it("Can use after render effects correctly with props in children", () => {
+        let called = 0;
+        let afterRenderContents = "";
+        const Parent: Small.ParentComponent = (props) => {
+            return <div>{props.children}</div>
+        };
+        const Stateful: Small.Component<{ state: number, setState: (value: number) => void }> = (props) => {
+            const ref = Small.useRef<HTMLButtonElement>();
+            Small.useEffect(
+                () => {
+                    called++;
+                    afterRenderContents = ref.current?.innerHTML || "";
+                },
+                "after-render",
+                [props.state]
+            );
+            return (
+                <button ref={ref} id="click" onclick={() => props.setState(props.state + 1)}>
+                    {props.state}
+                </button>
+            );
+        };
+        const TestComponent = () => {
+            const [state, setState] = Small.useState(0);
+            return (
+                <Parent>
+                    <Stateful setState={setState} state={state} />
+                </Parent>
+            );
+        };
+        Small.mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        expect(called).toBe(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toBe(2);
+        expect(afterRenderContents).toEqual("1");
+    });
+    it("Can use after render effects correctly with function as children", () => {
+        let called = 0;
+        let afterRenderContents = "";
+        const Parent: Small.Component<{ children: (state: number, setState: (value: number) => void) => JSX.Element }> = (props) => {
+            const [state, setState] = Small.useState(0);
+            return <div>{props.children(state, setState)}</div>
+        };
+        const Stateful: Small.Component<{ state: number, setState: (value: number) => void }> = (props) => {
+            const ref = Small.useRef<HTMLButtonElement>();
+            Small.useEffect(
+                () => {
+                    called++;
+                    afterRenderContents = ref.current?.innerHTML || "";
+                },
+                "after-render",
+                [props.state]
+            );
+            return (
+                <button ref={ref} id="click" onclick={() => props.setState(props.state + 1)}>
+                    {props.state}
+                </button>
+            );
+        };
+        const TestComponent = () => {
+            return (
+                <Parent>
+                    {(state, setState) => <Stateful setState={setState} state={state} />}
+                </Parent>
+            );
+        };
+        Small.mount(<TestComponent />, "#root");
+        jest.runAllTimers();
+        expect(called).toBe(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toBe(2);
+        expect(afterRenderContents).toEqual("1");
+    });
 });
