@@ -62,7 +62,27 @@ describe("Can use children/parent components and custom children types", () => {
         expect(unmount).toBeTruthy();
         expect($("#child").length).toBe(0);
     });
-    it("Can use function as children", () => { });
+    it("Can use function as children", () => {
+        const FnAsChildren: Small.Component<{ children: (state: number) => JSX.Element }> = (props) => {
+            const [state, setState] = Small.useState(1);
+            return <button id="click" onclick={() => setState(state + 1)}>{props.children(state)}</button>;
+        };
+        const Parent: Small.Component = () => {
+            return (
+                <FnAsChildren>
+                    {(state) => (
+                        <div>{state}</div>
+                    )}
+                </FnAsChildren>
+            );
+        };
+        Small.mount(<Parent />, "#root");
+        jest.runAllTimers();
+        expect($("#click > div")[0].innerHTML).toEqual("1");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#click > div")[0].innerHTML).toEqual("2");
+    });
     it("Can use state updates correctly", () => { });
     it("Can use before render effects correctly", () => { });
     it("Can use after effects correctly", () => { });

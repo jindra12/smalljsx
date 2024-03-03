@@ -3,8 +3,15 @@ const dispatchUpdate = () => {
     document.dispatchEvent(event);
 };
 
-export type Component<T extends object = {}> = (props: T & { children?: never }) => JSX.Element;
-export type ParentComponent<T extends object = {}> = (props: T & { children?: JSX.Element }) => JSX.Element;
+type ChildType<T, TOriginal> = T extends { children: any }
+    ? T
+    : T & { children?: TOriginal };
+export type Component<T extends object = {}> = (
+    props: ChildType<T, never>
+) => JSX.Element;
+export type ParentComponent<T extends object = {}> = (
+    props: ChildType<T, JSX.Element>
+) => JSX.Element;
 
 class Fragment {
     children?: JSX.Element[];
@@ -75,7 +82,9 @@ class HooksStack {
 }
 
 interface StateHelper {
-    useState<T>(initialState: T | (() => T)): [T, (value: T | ((prevValue: T) => T)) => void];
+    useState<T>(
+        initialState: T | (() => T)
+    ): [T, (value: T | ((prevValue: T) => T)) => void];
     useState<T>(): [T | undefined, (value: T | ((prevValue: T) => T)) => void];
 }
 
@@ -111,7 +120,9 @@ interface RefHelper {
 
 type RefFn = RefHelper["useRef"];
 
-export const useRef: RefFn = <T>(initialRef?: T | (() => T) | undefined): { current: T | undefined } => {
+export const useRef: RefFn = <T>(
+    initialRef?: T | (() => T) | undefined
+): { current: T | undefined } => {
     const hooks = context.pointer.hooks;
     const index = hooks.index;
     const currentRef = hooks.hasStack()
@@ -268,8 +279,8 @@ type Stack = {
     updated: number;
     parent?: Stack;
     hooks: HooksStack;
-    props: any,
-    rawChildren: JSX.Element[],
+    props: any;
+    rawChildren: JSX.Element[];
     rendered?: HTMLElement | Text;
     treeContext: Record<string, any>;
 };
@@ -281,7 +292,7 @@ class Context {
     root: Stack = Context.createRoot();
     postUpdateActions: Array<() => void> = [];
     pointer: Stack;
-    
+
     private static createRoot = (): Stack => {
         return {
             key: "root",
@@ -295,17 +306,20 @@ class Context {
             hooks: new HooksStack(),
             treeContext: {},
         };
-    }
+    };
 
-    private createUpdate = (stack: () => Stack, onRerender?: (stack: Stack) => () => void) => {
+    private createUpdate = (
+        stack: () => Stack,
+        onRerender?: (stack: Stack) => () => void
+    ) => {
         return () => {
             if (onRerender) {
                 this.postUpdateActions.push(onRerender(stack()));
                 dispatchUpdate();
             }
-        }
+        };
     };
-    
+
     private collectUnmountHooks = (child: Stack) => {
         const acc: Array<() => void> = [];
         acc.push(...child.hooks.unmountActions);
@@ -318,7 +332,7 @@ class Context {
     constructor() {
         this.pointer = this.root;
     }
-    
+
     startComponentStack = <T>(
         component: Function | string,
         props: T | null,
@@ -333,8 +347,7 @@ class Context {
             this.pointer.updated++;
             return;
         }
-        const previous =
-            this.pointer.children[key || this.pointer.toUpdateIndex];
+        const previous = this.pointer.children[key || this.pointer.toUpdateIndex];
         if (previous && previous.component === component) {
             this.pointer.toUpdateIndex++;
             previous.updated++;
@@ -450,7 +463,7 @@ const createTag = <T>(
 ): HTMLElement => {
     const htmlTag = document.createElement(component);
     for (const key in props || {}) {
-        if (key !== "ref" && key !== "key") {
+        if (key !== "ref" && key !== "key" && key !== "children") {
             if (key.startsWith("on")) {
                 htmlTag.addEventListener(key.slice(2), (props as any)[key]);
             } else {
@@ -462,7 +475,12 @@ const createTag = <T>(
             }
         }
     }
-    context.startComponentStack(component, props, children, (props as any)?.key?.toString());
+    context.startComponentStack(
+        component,
+        props,
+        children,
+        (props as any)?.key?.toString()
+    );
     resolveChildren(htmlTag, children);
     if ((props as any)?.ref) {
         (props as any).ref.current = htmlTag;
@@ -475,10 +493,19 @@ const createComponent = <T>(
     component: (props?: T) => JSX.Element,
     props: T | null,
     children: JSX.Element[],
-    hasCorrectPointer = false,
+    hasCorrectPointer = false
 ): HTMLElement | Text => {
     const copiedProps = Object.assign({}, props || {}, {
         get children() {
+            if (Array.isArray(children) && children.length === 1) {
+                const singleChild = children[0];
+                if (
+                    typeof singleChild === "function" &&
+                    !isMarkedComponent(singleChild)
+                ) {
+                    return singleChild;
+                }
+            }
             return executeChildren(children);
         },
     }) as any as T;
@@ -491,14 +518,16 @@ const createComponent = <T>(
         (stack) => () => {
             context.pointer = stack;
             const original = stack.rendered;
-            const next = createComponent(component, context.pointer.props, context.pointer.rawChildren, true);
-            original?.parentElement?.replaceChild(
-                next,
-                original!
+            const next = createComponent(
+                component,
+                context.pointer.props,
+                context.pointer.rawChildren,
+                true
             );
+            original?.parentElement?.replaceChild(next, original!);
             stack.rendered = next;
             return;
-        },
+        }
     );
     const htmlTag = context.processJSXToHtml(component(copiedProps));
     context.endComponentStack();
@@ -560,12 +589,19 @@ export const mount = (
     });
 };
 
+const isMarkedComponent = (marked?: any) => Boolean(marked?.__marked);
+
+const markAsComponent = <T>(toMark: T & { __marked?: boolean }): T => {
+    toMark.__marked = true;
+    return toMark;
+};
+
 export const h = <T>(
     component: (new () => Fragment) | ((props?: T) => JSX.Element) | string,
     props: T | null,
     ...children: JSX.Element[]
 ) => {
-    return () => {
+    return markAsComponent(() => {
         if (typeof component === "string") {
             return createTag(component, props, children);
         }
@@ -573,7 +609,7 @@ export const h = <T>(
             return new Fragment(children);
         }
         return createComponent(component, props, children);
-    };
+    });
 };
 
 if (typeof window !== undefined) {
