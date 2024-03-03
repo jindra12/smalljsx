@@ -306,6 +306,15 @@ class Context {
         }
     };
     
+    private collectUnmountHooks = (child: Stack) => {
+        const acc: Array<() => void> = [];
+        acc.push(...child.hooks.unmountActions);
+        for (const key in child.children) {
+            acc.push(...this.collectUnmountHooks(child.children[key]));
+        }
+        return acc;
+    };
+
     constructor() {
         this.pointer = this.root;
     }
@@ -378,8 +387,7 @@ class Context {
         for (const key in this.pointer.children) {
             const child = this.pointer.children[key];
             if (child.updated < this.pointer.updated) {
-                const unmountActions = child.hooks.unmountActions;
-                this.postUpdateActions.push(...unmountActions);
+                this.postUpdateActions.push(...this.collectUnmountHooks(child));
                 delete this.pointer.children[key];
             }
         }
@@ -420,14 +428,19 @@ const executeChildren = (children: JSX.Element[]) => {
 
 const resolveChildren = (htmlTag: HTMLElement, children: JSX.Element[]) => {
     const executed = executeChildren(children);
-    for (let i = 0; i < executed.length; i++) {
-        const child = executed[i];
-        if (child instanceof HTMLElement) {
-            htmlTag.appendChild(child);
-        } else {
-            htmlTag.appendChild(document.createTextNode(child?.toString() || ""));
+    const appendChildren = (executed: JSX.ResolvedChildren[]) => {
+        for (let i = 0; i < executed.length; i++) {
+            const child = executed[i];
+            if (Array.isArray(child)) {
+                appendChildren(child);
+            } else if (child instanceof HTMLElement) {
+                htmlTag.appendChild(child);
+            } else {
+                htmlTag.appendChild(document.createTextNode(child?.toString() || ""));
+            }
         }
-    }
+    };
+    appendChildren(executed);
 };
 
 const createTag = <T>(
