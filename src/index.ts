@@ -13,27 +13,11 @@ export type ParentComponent<T extends object = {}> = (
     props: ChildType<T, JSX.Element>
 ) => JSX.Element;
 
-class Fragment {
-    children?: JSX.Element[];
-    constructor(children?: JSX.Element[]) {
-        this.children = children;
-    }
-}
+class Fragment { }
 
 const isFragmentConstructor = (
     component: any
 ): component is new () => Fragment => component === Fragment;
-
-const isFragment = (
-    component:
-        | string
-        | number
-        | boolean
-        | HTMLElement
-        | JSX.Fragment
-        | null
-        | undefined
-): component is JSX.Fragment => component instanceof Fragment;
 
 let count = 0;
 const getUniqueId = () => {
@@ -281,7 +265,7 @@ type Stack = {
     hooks: HooksStack;
     props: any;
     rawChildren: JSX.Element[];
-    rendered?: HTMLElement | Text;
+    rendered?: Text | HTMLElement | DocumentFragment;
     treeContext: Record<string, any>;
 };
 
@@ -327,6 +311,14 @@ class Context {
             acc.push(...this.collectUnmountHooks(child.children[key]));
         }
         return acc;
+    };
+
+    private populateFragment = (children: (Text | HTMLElement)[]) => {
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < children.length; i++) {
+            fragment.appendChild(children[i]);
+        }
+        return fragment;
     };
 
     constructor() {
@@ -375,13 +367,18 @@ class Context {
             this.pointer = nextStack;
         }
     };
-    processJSXToHtml = (element: JSX.Element): Text | HTMLElement => {
+    processJSXToHtml = (
+        element: JSX.Element
+    ): Text | HTMLElement | DocumentFragment => {
         const executed = typeof element === "function" ? element() : element;
         const portal = this.pointer.hooks.stored.find(isPortal);
         const toRender =
-            executed instanceof HTMLElement
+            (executed instanceof HTMLElement || executed instanceof DocumentFragment)
                 ? executed
-                : document.createTextNode(executed?.toString() || "");
+                : Array.isArray(executed)
+                    ? this.populateFragment(executed)
+                    : document.createTextNode(executed?.toString() || "");
+
         if (portal) {
             portal.portal.innerHTML = "";
             portal.portal.appendChild(toRender);
@@ -430,8 +427,8 @@ const executeChildren = (children: JSX.Element[]) => {
     for (let i = 0; i < children.length; i++) {
         const child = children[i];
         const executed = typeof child === "function" ? child() : child;
-        if (isFragment(executed)) {
-            acc.push(...executeChildren(executed.children || []));
+        if (Array.isArray(executed)) {
+            acc.push(...executed);
         } else {
             acc.push(executed);
         }
@@ -446,7 +443,7 @@ const resolveChildren = (htmlTag: HTMLElement, children: JSX.Element[]) => {
             const child = executed[i];
             if (Array.isArray(child)) {
                 appendChildren(child);
-            } else if (child instanceof HTMLElement) {
+            } else if (child && typeof child === "object") {
                 htmlTag.appendChild(child);
             } else {
                 htmlTag.appendChild(document.createTextNode(child?.toString() || ""));
@@ -454,6 +451,25 @@ const resolveChildren = (htmlTag: HTMLElement, children: JSX.Element[]) => {
         }
     };
     appendChildren(executed);
+};
+
+const resolveFragmentChildren = (children: JSX.Element[]) => {
+    const executed = executeChildren(children);
+    const accumulator: (HTMLElement | Text)[] = [];
+    const appendChildren = (executed: JSX.ResolvedChildren[]) => {
+        for (let i = 0; i < executed.length; i++) {
+            const child = executed[i];
+            if (Array.isArray(child)) {
+                appendChildren(child);
+            } else if (child && typeof child === "object") {
+                accumulator.push(child);
+            } else {
+                accumulator.push(document.createTextNode(child?.toString() || ""));
+            }
+        }
+    };
+    appendChildren(executed);
+    return accumulator;
 };
 
 const createTag = <T>(
@@ -489,12 +505,24 @@ const createTag = <T>(
     return htmlTag;
 };
 
+const createFragment = <T>(props: T | null, children: JSX.Element[]) => {
+    context.startComponentStack(
+        "fragment",
+        props,
+        children,
+        (props as any)?.key?.toString()
+    );
+    const resolved = resolveFragmentChildren(children);
+    context.endComponentStack();
+    return resolved;
+};
+
 const createComponent = <T>(
     component: (props?: T) => JSX.Element,
     props: T | null,
     children: JSX.Element[],
     hasCorrectPointer = false
-): HTMLElement | Text => {
+): HTMLElement | Text | DocumentFragment => {
     const copiedProps = Object.assign({}, props || {}, {
         get children() {
             if (Array.isArray(children) && children.length === 1) {
@@ -551,19 +579,17 @@ export const mount = (
     }
     if (typeof hResult === "function") {
         const exec = hResult();
-        if (isFragment(exec)) {
-            resolveChildren(entryPoint, exec.children || []);
+        entryPoint.appendChild(exec);
+    } else if (hResult && typeof hResult === "object") {
+        if (Array.isArray(hResult)) {
+            for (let i = 0; i < hResult.length; i++) {
+                entryPoint.appendChild(hResult[i]);
+            }
         } else {
-            entryPoint.appendChild(exec);
+            entryPoint.appendChild(hResult);
         }
     } else {
-        if (isFragment(hResult)) {
-            resolveChildren(entryPoint, hResult.children || []);
-        } else {
-            entryPoint.appendChild(
-                document.createTextNode(hResult?.toString() || "")
-            );
-        }
+        entryPoint.appendChild(document.createTextNode(hResult?.toString() || ""));
     }
     const postUpdate = () => {
         for (let i = 0; i < context.postUpdateActions.length; i++) {
@@ -606,7 +632,7 @@ export const h = <T>(
             return createTag(component, props, children);
         }
         if (isFragmentConstructor(component)) {
-            return new Fragment(children);
+            return createFragment(props, children);
         }
         return createComponent(component, props, children);
     });
@@ -614,4 +640,5 @@ export const h = <T>(
 
 if (typeof window !== undefined) {
     (window as any).h = h;
+    (window as any).Fragment = Fragment;
 }

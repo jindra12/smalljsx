@@ -303,7 +303,7 @@ declare namespace JSX {
             ref?: { current?: HTMLElementTagNameMap[K] }
         });
     };
-    type Element = (() => HTMLElement) | (() => Fragment) | string | number | boolean | null | undefined;
+    type Element = (() => HTMLElement) | HTMLElement[] | string | number | boolean | null | undefined;
     interface ElementChildrenAttribute {
         children: {}
     }
