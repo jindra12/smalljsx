@@ -579,7 +579,13 @@ export const mount = (
     }
     if (typeof hResult === "function") {
         const exec = hResult();
-        entryPoint.appendChild(exec);
+        if (Array.isArray(exec)) {
+            for (let i = 0; i < exec.length; i++) {
+                entryPoint.appendChild(exec[i]);
+            }
+        } else {
+            entryPoint.appendChild(exec);
+        }
     } else if (hResult && typeof hResult === "object") {
         if (Array.isArray(hResult)) {
             for (let i = 0; i < hResult.length; i++) {
@@ -599,7 +605,7 @@ export const mount = (
     };
     postUpdate();
     let updateValue = 0;
-    const timeoutMs = 20;
+    const timeoutMs = 5;
     document.addEventListener("smalljsx-update", () => {
         updateValue += 1;
         const myUpdate = updateValue;
