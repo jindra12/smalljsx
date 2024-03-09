@@ -303,11 +303,11 @@ declare namespace JSX {
             ref?: { current?: HTMLElementTagNameMap[K] }
         });
     };
-    type Element = (() => HTMLElement) | HTMLElement[] | string | number | boolean | null | undefined;
+    type Element = (() => HTMLElement) | DocumentFragment | string | number | boolean | null | undefined;
     interface ElementChildrenAttribute {
         children: {}
     }
-    type ResolvedChildren = HTMLElement | string | number | boolean | null | undefined;
+    type ResolvedChildren = HTMLElement | DocumentFragment | string | number | boolean | null | undefined;
     type Context = {
         startComponentStack: <T>(component: string | ((props: T) => HTMLElement), key?: string) => void;
         endComponentStack: () => void;

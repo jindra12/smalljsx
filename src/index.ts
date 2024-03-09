@@ -3,6 +3,7 @@ const dispatchUpdate = () => {
     document.dispatchEvent(event);
 };
 
+type RenderedType = Text | HTMLElement | DocumentFragment;
 type ChildType<T, TOriginal> = T extends { children: any }
     ? T
     : T & { children?: TOriginal };
@@ -265,7 +266,7 @@ type Stack = {
     hooks: HooksStack;
     props: any;
     rawChildren: JSX.Element[];
-    rendered?: Text | HTMLElement | DocumentFragment;
+    rendered?: RenderedType;
     treeContext: Record<string, any>;
 };
 
@@ -311,14 +312,6 @@ class Context {
             acc.push(...this.collectUnmountHooks(child.children[key]));
         }
         return acc;
-    };
-
-    private populateFragment = (children: (Text | HTMLElement)[]) => {
-        const fragment = document.createDocumentFragment();
-        for (let i = 0; i < children.length; i++) {
-            fragment.appendChild(children[i]);
-        }
-        return fragment;
     };
 
     constructor() {
@@ -369,15 +362,13 @@ class Context {
     };
     processJSXToHtml = (
         element: JSX.Element
-    ): Text | HTMLElement | DocumentFragment => {
+    ): RenderedType => {
         const executed = typeof element === "function" ? element() : element;
         const portal = this.pointer.hooks.stored.find(isPortal);
         const toRender =
             (executed instanceof HTMLElement || executed instanceof DocumentFragment)
                 ? executed
-                : Array.isArray(executed)
-                    ? this.populateFragment(executed)
-                    : document.createTextNode(executed?.toString() || "");
+                : document.createTextNode(executed?.toString() || "");
 
         if (portal) {
             portal.portal.innerHTML = "";
@@ -422,16 +413,20 @@ let context = new Context();
 
 export const __reset = () => context.reset();
 
+const populateFragment = (children: (Text | HTMLElement | DocumentFragment)[]) => {
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < children.length; i++) {
+        appendChild(fragment, children[i]);
+    }
+    return fragment;
+};
+
 const executeChildren = (children: JSX.Element[]) => {
     const acc: JSX.ResolvedChildren[] = [];
     for (let i = 0; i < children.length; i++) {
         const child = children[i];
         const executed = typeof child === "function" ? child() : child;
-        if (Array.isArray(executed)) {
-            acc.push(...executed);
-        } else {
-            acc.push(executed);
-        }
+        acc.push(executed);
     }
     return acc;
 };
@@ -444,9 +439,9 @@ const resolveChildren = (htmlTag: HTMLElement, children: JSX.Element[]) => {
             if (Array.isArray(child)) {
                 appendChildren(child);
             } else if (child && typeof child === "object") {
-                htmlTag.appendChild(child);
+                appendChild(htmlTag, child);
             } else {
-                htmlTag.appendChild(document.createTextNode(child?.toString() || ""));
+                appendChild(htmlTag, document.createTextNode(child?.toString() || ""));
             }
         }
     };
@@ -455,7 +450,7 @@ const resolveChildren = (htmlTag: HTMLElement, children: JSX.Element[]) => {
 
 const resolveFragmentChildren = (children: JSX.Element[]) => {
     const executed = executeChildren(children);
-    const accumulator: (HTMLElement | Text)[] = [];
+    const accumulator: RenderedType[] = [];
     const appendChildren = (executed: JSX.ResolvedChildren[]) => {
         for (let i = 0; i < executed.length; i++) {
             const child = executed[i];
@@ -513,8 +508,9 @@ const createFragment = <T>(props: T | null, children: JSX.Element[]) => {
         (props as any)?.key?.toString()
     );
     const resolved = resolveFragmentChildren(children);
+    const fragment = populateFragment(resolved);
     context.endComponentStack();
-    return resolved;
+    return fragment;
 };
 
 const createComponent = <T>(
@@ -552,7 +548,7 @@ const createComponent = <T>(
                 context.pointer.rawChildren,
                 true
             );
-            original?.parentElement?.replaceChild(next, original!);
+            replaceChild(next, original!);
             stack.rendered = next;
             return;
         }
@@ -560,6 +556,62 @@ const createComponent = <T>(
     const htmlTag = context.processJSXToHtml(component(copiedProps));
     context.endComponentStack();
     return htmlTag;
+};
+
+type ParentRendered = RenderedType & { __parent?: ParentRendered, __children?: ParentRendered[] };
+
+const appendChild = (parent: ParentRendered, child: ParentRendered) => {
+    parent.appendChild(child);
+    child.__parent = parent;
+    parent.__children ||= [];
+    parent.__children!.push(child);
+};
+
+const traverseUpForRealParent = (element: ParentRendered): (undefined | HTMLElement) => {
+    if (!element) {
+        return undefined;
+    }
+    if (!(element instanceof DocumentFragment)) {
+        return element as HTMLElement;
+    }
+    return traverseUpForRealParent(element.__parent!);
+};
+
+const traverseDownForChildren = (element: ParentRendered): ParentRendered[] => {
+    return element.__children?.reduce((acc: ParentRendered[], child) => {
+        if (child instanceof DocumentFragment) {
+            acc.push(...traverseDownForChildren(child));
+        } else {
+            acc.push(child);
+        }
+        return acc;
+    }, []) || [];
+};
+
+const replaceChild = (next: ParentRendered, original: ParentRendered) => {
+    const isOriginalFragment = original instanceof DocumentFragment;
+    if (!isOriginalFragment) {
+        original.parentElement?.replaceChild(next, original);
+        next.__parent = original.__parent;
+        original.__parent?.__children?.filter(
+            (child) => child === original ? next : child
+        );
+    } else {
+        const realParent = traverseUpForRealParent(original);
+        const realChildren = traverseDownForChildren(original).filter(
+            (child) => realParent?.contains(child)
+        );
+        if (realChildren.length > 0) {
+            realParent?.replaceChild(next, realChildren[0]);
+            next.__parent = original.__parent;
+            original.__parent?.__children?.filter(
+                (child) => child === original ? next : child
+            );
+            for (let i = 1; i < realChildren.length; i++) {
+                realParent?.removeChild(realChildren[i]);
+            }
+        }
+    }
 };
 
 export const mount = (
@@ -579,23 +631,11 @@ export const mount = (
     }
     if (typeof hResult === "function") {
         const exec = hResult();
-        if (Array.isArray(exec)) {
-            for (let i = 0; i < exec.length; i++) {
-                entryPoint.appendChild(exec[i]);
-            }
-        } else {
-            entryPoint.appendChild(exec);
-        }
+        appendChild(entryPoint, exec);
     } else if (hResult && typeof hResult === "object") {
-        if (Array.isArray(hResult)) {
-            for (let i = 0; i < hResult.length; i++) {
-                entryPoint.appendChild(hResult[i]);
-            }
-        } else {
-            entryPoint.appendChild(hResult);
-        }
+        appendChild(entryPoint, hResult);
     } else {
-        entryPoint.appendChild(document.createTextNode(hResult?.toString() || ""));
+        appendChild(entryPoint, document.createTextNode(hResult?.toString() || ""));
     }
     const postUpdate = () => {
         for (let i = 0; i < context.postUpdateActions.length; i++) {
