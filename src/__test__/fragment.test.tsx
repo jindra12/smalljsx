@@ -12,7 +12,12 @@ describe("Can use fragments", () => {
     });
     it("Can use simple fragments", () => {
         const Parent: Small.ParentComponent = (props) => {
-            return <>{props.children}<div>Not me!</div></>;
+            return (
+                <>
+                    {props.children}
+                    <div>Not me!</div>
+                </>
+            );
         };
         const Component: Small.Component = () => {
             return (
@@ -28,7 +33,13 @@ describe("Can use fragments", () => {
         );
     });
     it("Can render multiple children on mount", () => {
-        Small.mount(<><div>Yes</div><div>No</div></>, "#root");
+        Small.mount(
+            <>
+                <div>Yes</div>
+                <div>No</div>
+            </>,
+            "#root"
+        );
         jest.runAllTimers();
         expect($("#root")[0].outerHTML).toEqual(
             '<div id="root"><div>Yes</div><div>No</div></div>'
@@ -51,7 +62,13 @@ describe("Can use fragments", () => {
                 </button>
             );
         };
-        Small.mount(<><Test1 /><Test2 /></>, "#root");
+        Small.mount(
+            <>
+                <Test1 />
+                <Test2 />
+            </>,
+            "#root"
+        );
         jest.runAllTimers();
         $("#click")[0].click();
         jest.runAllTimers();
@@ -67,12 +84,16 @@ describe("Can use fragments", () => {
         expect($("#clack")[0].innerHTML).toBe("4");
     });
     it("Can work with function as children", () => {
-        const Parent: Small.Component<{ children: (state: number) => JSX.Element }> = (props) => {
+        const Parent: Small.Component<{
+            children: (state: number) => JSX.Element;
+        }> = (props) => {
             const [state, setState] = Small.useState(1);
             return (
                 <>
                     {props.children(state)}
-                    <button id="click" onclick={() => setState(state + 1)}>Click me</button>
+                    <button id="click" onclick={() => setState(state + 1)}>
+                        Click me
+                    </button>
                 </>
             );
         };
@@ -86,13 +107,70 @@ describe("Can use fragments", () => {
                         </>
                     )}
                 </Parent>
-            )
+            );
         };
-        Small.mount(<><Container /></>, "#root");
+        Small.mount(
+            <>
+                <Container />
+            </>,
+            "#root"
+        );
         jest.runAllTimers();
         $("#click")[0].click();
         jest.runAllTimers();
         expect($(".test")[0].innerHTML).toBe("2");
         expect($(".taste")[0].innerHTML).toBe("2");
-    })
+    });
+    it("Can work with fragments conditionally", () => {
+        const OddFrag: Small.Component<{ state: number; setState: () => void }> = (
+            props
+        ) => (
+            <div>
+                <>
+                    <p>{props.state}</p>
+                    <div>{props.state}</div>
+                    <button id="click" onclick={props.setState}>
+                        Update
+                    </button>
+                </>
+            </div>
+        );
+        const EvenFrag: Small.Component<{ state: number; setState: () => void }> = (
+            props
+        ) => (
+            <>
+                <div>
+                    <>{props.state}</>
+                    <>{props.state}</>
+                    <button id="click" onclick={props.setState}>
+                        Update
+                    </button>
+                </div>
+            </>
+        );
+        const Switcher: Small.Component = () => {
+            const [state, setState] = Small.useState(0);
+            return state % 2 ? (
+                <OddFrag state={state} setState={() => setState(state + 1)} />
+            ) : (
+                <EvenFrag state={state} setState={() => setState(state + 1)} />
+            );
+        };
+        Small.mount(
+            <Switcher />,
+            "#root"
+        );
+        jest.runAllTimers();
+        expect($("#root")[0].outerHTML).toMatchSnapshot();
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#root")[0].outerHTML).toMatchSnapshot();
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#root")[0].outerHTML).toMatchSnapshot();
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#root")[0].outerHTML).toMatchSnapshot();
+        $("#click")[0].click();
+    });
 });

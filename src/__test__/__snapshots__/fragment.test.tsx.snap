@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Can use fragments Can work with fragments conditionally 1`] = `"<div id="root"><div>00<button id="click">Update</button></div></div>"`;
+
+exports[`Can use fragments Can work with fragments conditionally 2`] = `"<div id="root"><div><p>1</p><div>1</div><button id="click">Update</button></div></div>"`;
+
+exports[`Can use fragments Can work with fragments conditionally 3`] = `"<div id="root"><div>22<button id="click">Update</button></div></div>"`;
+
+exports[`Can use fragments Can work with fragments conditionally 4`] = `"<div id="root"><div><p>3</p><div>3</div><button id="click">Update</button></div></div>"`;
