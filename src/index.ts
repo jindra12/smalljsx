@@ -423,11 +423,18 @@ const populateFragment = (children: (Text | HTMLElement | DocumentFragment)[]) =
 
 const executeChildren = (children: JSX.Element[]) => {
     const acc: JSX.ResolvedChildren[] = [];
-    for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        const executed = typeof child === "function" ? child() : child;
-        acc.push(executed);
-    }
+    const execute = (children: JSX.Element[]) => {
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const executed = typeof child === "function" ? child() : child;
+            if (Array.isArray(executed)) {
+                execute(executed);
+            } else {
+                acc.push(executed);
+            }
+        }
+    };
+    execute(children);
     return acc;
 };
 
@@ -614,6 +621,20 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
     }
 };
 
+const appendChildDeconstruction = (item: MaybeArray<HTMLElement
+    | DocumentFragment
+    | string
+    | number
+    | boolean
+    | null
+    | undefined>, mount: HTMLElement) => {
+    if (Array.isArray(item)) {
+        item.forEach((i) => appendChildDeconstruction(i, mount))
+    }
+    const element = (item instanceof HTMLElement || item instanceof DocumentFragment ? item : document.createTextNode(item?.toString() || "")) as HTMLElement;
+    appendChild(mount, element);
+}
+
 export const mount = (
     hResult: JSX.Element,
     mountPoint: string | HTMLElement,
@@ -631,9 +652,9 @@ export const mount = (
     }
     if (typeof hResult === "function") {
         const exec = hResult();
-        appendChild(entryPoint, exec);
+        appendChildDeconstruction(exec, entryPoint);
     } else if (hResult && typeof hResult === "object") {
-        appendChild(entryPoint, hResult);
+        appendChildDeconstruction(hResult as any, entryPoint);
     } else {
         appendChild(entryPoint, document.createTextNode(hResult?.toString() || ""));
     }
@@ -645,7 +666,6 @@ export const mount = (
     };
     postUpdate();
     let updateValue = 0;
-    const timeoutMs = 5;
     document.addEventListener("smalljsx-update", () => {
         updateValue += 1;
         const myUpdate = updateValue;
@@ -657,7 +677,7 @@ export const mount = (
                 postUpdate();
                 updateValue = 0;
             }
-        }, timeoutMs);
+        });
     });
 };
 

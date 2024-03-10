@@ -295,6 +295,9 @@ interface CorrectedFormType extends HTMLElement {
     target: string;
 }
 
+type MaybeArray<T> = T | T[] | (T | T[])[];
+type MaybeFunction<T> = T | (() => T);
+
 declare namespace JSX {
     type ElementType<K extends keyof HTMLElementTagNameMap> = Partial<
         Omit<
@@ -308,13 +311,13 @@ declare namespace JSX {
             ref?: { current?: HTMLElementTagNameMap[K] };
         };
     };
-    type Element = (() => HTMLElement)
+    type Element = MaybeArray<MaybeFunction<HTMLElement
         | DocumentFragment
         | string
         | number
         | boolean
         | null
-        | undefined;
+        | undefined>>;
     interface ElementChildrenAttribute {
         children: {};
     }
