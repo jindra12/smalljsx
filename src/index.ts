@@ -5,8 +5,8 @@ const dispatchUpdate = () => {
 
 type RenderedType = Text | HTMLElement | DocumentFragment;
 type ChildType<T, TOriginal> = T extends { children: any }
-    ? T
-    : T & { children?: TOriginal };
+    ? T & { key?: string | number }
+    : T & { children?: TOriginal; key?: string | number };
 export type Component<T extends object = {}> = (
     props: ChildType<T, never>
 ) => JSX.Element;

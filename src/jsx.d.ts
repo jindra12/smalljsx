@@ -88,14 +88,14 @@ type BannedKeys =
     | "attributeStyleMap";
 
 type ValidationBannedKeys =
-| "form"
-| "labels"
-| "validationMessage"
-| "validity"
-| "willValidate"
-| "checkValidity"
-| "reportValidity"
-| "setCustomValidity";
+    | "form"
+    | "labels"
+    | "validationMessage"
+    | "validity"
+    | "willValidate"
+    | "checkValidity"
+    | "reportValidity"
+    | "setCustomValidity";
 
 type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     K extends "input"
@@ -114,24 +114,13 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "stepDown"
     | "stepUp"
     : K extends "a"
-    ?
-    | "relList"
-    | "text"
-    | "charset"
-    | "coords"
-    | "name"
-    | "shape"
+    ? "relList" | "text" | "charset" | "coords" | "name" | "shape"
     : K extends "area"
-    ?
-    | "relList"
+    ? "relList"
     : K extends "br"
     ? "clear"
     : K extends "body"
-    ?
-    | "aLink"
-    | "link"
-    | "text"
-    | "vLink"
+    ? "aLink" | "link" | "text" | "vLink"
     : K extends "button"
     ? ValidationBannedKeys
     : K extends "canvas"
@@ -142,20 +131,13 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "toDataURL"
     | "transferControlToOffscreen"
     : K extends "datalist"
-    ?
-    | "options"
+    ? "options"
     : K extends "dialog"
-    ?
-    | "close"
-    | "show"
-    | "showModal"
+    ? "close" | "show" | "showModal"
     : K extends "embed"
-    ?
-    | "getSVGDocument"
+    ? "getSVGDocument"
     : K extends "fieldset"
-    ?
-    | "elements"
-    | ValidationBannedKeys
+    ? "elements" | ValidationBannedKeys
     : K extends "form"
     ?
     | "elements"
@@ -167,11 +149,7 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | ValidationBannedKeys
     | "requestSubmit"
     : K extends "iframe"
-    ?
-    | "contentDocument"
-    | "contentWindow"
-    | "sandbox"
-    | "getSVGDocument"
+    ? "contentDocument" | "contentWindow" | "sandbox" | "getSVGDocument"
     : K extends "img"
     ?
     | "complete"
@@ -182,21 +160,15 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "naturalWidth"
     | "decode"
     : K extends "label"
-    ?
-    | "control"
-    | "form"
+    ? "control" | "form"
     : K extends "label"
-    ?
-    | "form"
+    ? "form"
     : K extends "link"
-    ?
-    | "relList"
+    ? "relList"
     : K extends "map"
-    ?
-    | "areas"
+    ? "areas"
     : K extends "meter"
-    ?
-    | "labels"
+    ? "labels"
     : K extends "object"
     ?
     | ValidationBannedKeys
@@ -204,17 +176,11 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "contentWindow"
     | "getSVGDocument"
     : K extends "option"
-    ?
-    | "index"
+    ? "index"
     : K extends "output"
-    ?
-    | ValidationBannedKeys
-    | "htmlFor"
-    | "type"
+    ? ValidationBannedKeys | "htmlFor" | "type"
     : K extends "progress"
-    ?
-    | "labels"
-    | "position"
+    ? "labels" | "position"
     : K extends "select"
     ?
     | ValidationBannedKeys
@@ -227,10 +193,7 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "remove"
     | number
     : K extends "slot"
-    ?
-    | "assign"
-    | "assignedElements"
-    | "assignedNodes"
+    ? "assign" | "assignedElements" | "assignedNodes"
     : K extends "table"
     ?
     | "rows"
@@ -246,17 +209,12 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "deleteTFoot"
     | "deleteTHead"
     | "insertRow"
-    : K extends ("tbody" | "tfoot" | "thead")
-    ?
-    | "rows"
-    | "deleteRow"
-    | "insertRow"
-    : K extends ("td" | "th")
-    ?
-    | "cellIndex"
+    : K extends "tbody" | "tfoot" | "thead"
+    ? "rows" | "deleteRow" | "insertRow"
+    : K extends "td" | "th"
+    ? "cellIndex"
     : K extends "template"
-    ?
-    | "content"
+    ? "content"
     : K extends "textarea"
     ?
     | ValidationBannedKeys
@@ -266,20 +224,9 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "setRangeText"
     | "setSelectionRange"
     : K extends "tr"
-    ?
-    | "cells"
-    | "rowIndex"
-    | "sectionRowIndex"
-    | "deleteCell"
-    | "insertCell"
+    ? "cells" | "rowIndex" | "sectionRowIndex" | "deleteCell" | "insertCell"
     : K extends "track"
-    ?
-    | "readyState"
-    | "track"
-    | "NONE"
-    | "LOADING"
-    | "LOADED"
-    | "ERROR"
+    ? "readyState" | "track" | "NONE" | "LOADING" | "LOADED" | "ERROR"
     : K extends "video"
     ?
     | "videoHeight"
@@ -290,30 +237,104 @@ type BannedKeysSpecific<K extends keyof HTMLElementTagNameMap> =
     | "requestVideoFrameCallback"
     : never;
 
+interface CorrectedFormType extends HTMLElement {
+    /**
+     * Sets or retrieves a list of character encodings for input data that must be accepted by the server processing the form.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/acceptCharset)
+     */
+    acceptCharset: string;
+    /**
+     * Sets or retrieves the URL to which the form content is sent for processing.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/action)
+     */
+    action: string;
+    /**
+     * Specifies whether autocomplete is applied to an editable text field.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/autocomplete)
+     */
+    autocomplete: AutoFillBase;
+    /**
+     * Sets or retrieves the MIME encoding for the form.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/encoding)
+     */
+    encoding: string;
+    /**
+     * Sets or retrieves the encoding type for the form.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/enctype)
+     */
+    enctype: string;
+    /**
+     * Sets or retrieves how to send the form data to the server.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/method)
+     */
+    method: string;
+    /**
+     * Sets or retrieves the name of the object.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/name)
+     */
+    name: string;
+    /**
+     * Designates a form that is not validated when submitted.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/noValidate)
+     */
+    noValidate: boolean;
+    rel: string;
+    /**
+     * Sets or retrieves the window or frame at which to target content.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLFormElement/target)
+     */
+    target: string;
+}
+
 declare namespace JSX {
     type ElementType<K extends keyof HTMLElementTagNameMap> = Partial<
         Omit<
-            HTMLElementTagNameMap[K],
+            K extends "form" ? CorrectedFormType : HTMLElementTagNameMap[K],
             keyof ParentNode | BannedKeys | BannedKeysSpecific<K>
         >
     >;
     type IntrinsicElements = {
-        [K in keyof HTMLElementTagNameMap]: (ElementType<K> & {
-            children?: Element | Element[];
-            ref?: { current?: HTMLElementTagNameMap[K] }
-        });
+        [K in keyof HTMLElementTagNameMap]: ElementType<K> & {
+            children?: Element | Element[] | (Element | Element[])[] | Element[][];
+            ref?: { current?: HTMLElementTagNameMap[K] };
+        };
     };
-    type Element = (() => HTMLElement) | DocumentFragment | string | number | boolean | null | undefined;
+    type Element = (() => HTMLElement)
+        | DocumentFragment
+        | string
+        | number
+        | boolean
+        | null
+        | undefined;
     interface ElementChildrenAttribute {
-        children: {}
+        children: {};
     }
-    type ResolvedChildren = HTMLElement | DocumentFragment | string | number | boolean | null | undefined;
+    type ResolvedChildren =
+        | HTMLElement
+        | DocumentFragment
+        | string
+        | number
+        | boolean
+        | null
+        | undefined;
     type Context = {
-        startComponentStack: <T>(component: string | ((props: T) => HTMLElement), key?: string) => void;
+        startComponentStack: <T>(
+            component: string | ((props: T) => HTMLElement),
+            key?: string
+        ) => void;
         endComponentStack: () => void;
     };
     class Fragment {
-        children?: Element[]
+        children?: Element[];
     }
 }
 
@@ -323,4 +344,4 @@ declare var h: <T extends object>(
     component: string | ((props?: T) => HTMLElement),
     props?: T | null,
     ...children: JSX.Element[]
-) => () => (HTMLElement | JSX.Fragment);
+) => () => HTMLElement | JSX.Fragment;

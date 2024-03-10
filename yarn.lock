@@ -2766,6 +2766,11 @@ jest@^29.7.0:
     import-local "^3.0.2"
     jest-cli "^29.7.0"
 
+jquery-sendkeys@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/jquery-sendkeys/-/jquery-sendkeys-4.0.0.tgz#8dc130fd2f4ffe75fcddd7cc58a85cccd7327d6b"
+  integrity sha512-gdH2LyH/2+q5y4Hya3PWDaUgWmCMevBL3MlBLcR7UVIW3+5OErdNRFU2Wgbn3kMSgqO+W0mlqkgxlqCjExhoRA==
+
 jquery@^3.7.1:
   version "3.7.1"
   resolved "https://registry.yarnpkg.com/jquery/-/jquery-3.7.1.tgz#083ef98927c9a6a74d05a6af02806566d16274de"
