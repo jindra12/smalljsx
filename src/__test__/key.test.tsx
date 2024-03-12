@@ -48,7 +48,7 @@ describe("Can use keys", () => {
         $("input[type='button']")[0].click();
         jest.runAllTimers();
         expect(mounted).toEqual(2);
-        expect(unmounted).toEqual(2);
+        expect(unmounted).toEqual(1);
     });
     it("Will keep track of array elements when key prop changes", () => {
         const formResult: any = {};

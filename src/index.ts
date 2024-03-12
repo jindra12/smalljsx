@@ -334,7 +334,9 @@ class Context {
         }
         const previous = this.pointer.children[key || this.pointer.toUpdateIndex];
         if (previous && previous.component === component) {
-            this.pointer.toUpdateIndex++;
+            if (!key) {
+                this.pointer.toUpdateIndex++;
+            }
             previous.updated++;
             this.pointer = previous;
             this.pointer.props = props;
@@ -348,7 +350,7 @@ class Context {
                 toUpdateIndex: 0,
                 props: props,
                 rawChildren: children,
-                updated: 1,
+                updated: this.pointer.updated,
                 parent: this.pointer,
                 hooks: new HooksStack(this.createUpdate(() => nextStack, onRerender)),
                 treeContext: {
@@ -360,13 +362,11 @@ class Context {
             this.pointer = nextStack;
         }
     };
-    processJSXToHtml = (
-        element: JSX.Element
-    ): RenderedType => {
+    processJSXToHtml = (element: JSX.Element): RenderedType => {
         const executed = typeof element === "function" ? element() : element;
         const portal = this.pointer.hooks.stored.find(isPortal);
         const toRender =
-            (executed instanceof HTMLElement || executed instanceof DocumentFragment)
+            executed instanceof HTMLElement || executed instanceof DocumentFragment
                 ? executed
                 : document.createTextNode(executed?.toString() || "");
 
@@ -389,6 +389,7 @@ class Context {
             const child = this.pointer.children[key];
             if (child.updated < this.pointer.updated) {
                 this.postUpdateActions.push(...this.collectUnmountHooks(child));
+                this.pointer.childrenCount--;
                 delete this.pointer.children[key];
             }
         }
@@ -413,7 +414,9 @@ let context = new Context();
 
 export const __reset = () => context.reset();
 
-const populateFragment = (children: (Text | HTMLElement | DocumentFragment)[]) => {
+const populateFragment = (
+    children: (Text | HTMLElement | DocumentFragment)[]
+) => {
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < children.length; i++) {
         appendChild(fragment, children[i]);
@@ -565,7 +568,10 @@ const createComponent = <T>(
     return htmlTag;
 };
 
-type ParentRendered = RenderedType & { __parent?: ParentRendered, __children?: ParentRendered[] };
+type ParentRendered = RenderedType & {
+    __parent?: ParentRendered;
+    __children?: ParentRendered[];
+};
 
 const appendChild = (parent: ParentRendered, child: ParentRendered) => {
     parent.appendChild(child);
@@ -574,7 +580,9 @@ const appendChild = (parent: ParentRendered, child: ParentRendered) => {
     parent.__children!.push(child);
 };
 
-const traverseUpForRealParent = (element: ParentRendered): (undefined | HTMLElement) => {
+const traverseUpForRealParent = (
+    element: ParentRendered
+): undefined | HTMLElement => {
     if (!element) {
         return undefined;
     }
@@ -585,14 +593,16 @@ const traverseUpForRealParent = (element: ParentRendered): (undefined | HTMLElem
 };
 
 const traverseDownForChildren = (element: ParentRendered): ParentRendered[] => {
-    return element.__children?.reduce((acc: ParentRendered[], child) => {
-        if (child instanceof DocumentFragment) {
-            acc.push(...traverseDownForChildren(child));
-        } else {
-            acc.push(child);
-        }
-        return acc;
-    }, []) || [];
+    return (
+        element.__children?.reduce((acc: ParentRendered[], child) => {
+            if (child instanceof DocumentFragment) {
+                acc.push(...traverseDownForChildren(child));
+            } else {
+                acc.push(child);
+            }
+            return acc;
+        }, []) || []
+    );
 };
 
 const replaceChild = (next: ParentRendered, original: ParentRendered) => {
@@ -600,19 +610,19 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
     if (!isOriginalFragment) {
         original.parentElement?.replaceChild(next, original);
         next.__parent = original.__parent;
-        original.__parent?.__children?.filter(
-            (child) => child === original ? next : child
+        original.__parent?.__children?.filter((child) =>
+            child === original ? next : child
         );
     } else {
         const realParent = traverseUpForRealParent(original);
-        const realChildren = traverseDownForChildren(original).filter(
-            (child) => realParent?.contains(child)
+        const realChildren = traverseDownForChildren(original).filter((child) =>
+            realParent?.contains(child)
         );
         if (realChildren.length > 0) {
             realParent?.replaceChild(next, realChildren[0]);
             next.__parent = original.__parent;
-            original.__parent?.__children?.filter(
-                (child) => child === original ? next : child
+            original.__parent?.__children?.filter((child) =>
+                child === original ? next : child
             );
             for (let i = 1; i < realChildren.length; i++) {
                 realParent?.removeChild(realChildren[i]);
@@ -621,19 +631,28 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
     }
 };
 
-const appendChildDeconstruction = (item: MaybeArray<HTMLElement
-    | DocumentFragment
-    | string
-    | number
-    | boolean
-    | null
-    | undefined>, mount: HTMLElement) => {
+const appendChildDeconstruction = (
+    item: MaybeArray<
+        | HTMLElement
+        | DocumentFragment
+        | string
+        | number
+        | boolean
+        | null
+        | undefined
+    >,
+    mount: HTMLElement
+) => {
     if (Array.isArray(item)) {
-        item.forEach((i) => appendChildDeconstruction(i, mount))
+        item.forEach((i) => appendChildDeconstruction(i, mount));
     }
-    const element = (item instanceof HTMLElement || item instanceof DocumentFragment ? item : document.createTextNode(item?.toString() || "")) as HTMLElement;
+    const element = (
+        item instanceof HTMLElement || item instanceof DocumentFragment
+            ? item
+            : document.createTextNode(item?.toString() || "")
+    ) as HTMLElement;
     appendChild(mount, element);
-}
+};
 
 export const mount = (
     hResult: JSX.Element,
