@@ -201,7 +201,14 @@ export interface TreeContext<T> {
     id: string;
 }
 
-export const createTreeContext = <T>(defaultValue: T): TreeContext<T> => {
+interface ContextHelper {
+    createContext<T>(defaultValue: T): TreeContext<T>;
+    createContext<T>(): TreeContext<T | undefined>;
+}
+
+type ContextType = ContextHelper["createContext"];
+
+export const createContext: ContextType = <T>(defaultValue?: T | undefined) => {
     const context = {
         defaultValue: defaultValue,
         id: getUniqueId(),
@@ -217,7 +224,7 @@ export const useSetContext = <T>(
     treeContexts[treeContext.id] = nextState || treeContext.defaultValue;
 };
 
-export const useContext = <T>(treeContext: TreeContext<T>) => {
+export const useContext = <T>(treeContext: TreeContext<T>): T => {
     const treeContexts = context.pointer.treeContext;
     return treeContexts[treeContext.id] || treeContext.defaultValue;
 };
