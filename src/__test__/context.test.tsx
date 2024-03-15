@@ -4,7 +4,7 @@ import * as Small from "../index";
 
 jest.useFakeTimers();
 
-describe("Can use keys", () => {
+describe("Can use context", () => {
     beforeEach(() => {
         document.body.innerHTML = "<div id='root' />";
     });

@@ -268,7 +268,7 @@ type Stack = {
     children: Record<string, Stack>;
     childrenCount: number;
     toUpdateIndex: number;
-    updated: number;
+    updated: Record<string, true>;
     parent?: Stack;
     hooks: HooksStack;
     props: any;
@@ -294,7 +294,7 @@ class Context {
             children: {},
             toUpdateIndex: 0,
             childrenCount: 0,
-            updated: 0,
+            updated: {},
             hooks: new HooksStack(),
             treeContext: {},
         };
@@ -336,28 +336,31 @@ class Context {
         if (hasCorrectPointer) {
             const ptr = this.pointer;
             this.pointer.hooks.onRerender = this.createUpdate(() => ptr, onRerender);
-            this.pointer.updated++;
+            this.pointer.updated = {};
             return;
         }
-        const previous = this.pointer.children[key || this.pointer.toUpdateIndex];
+        const prevIndex = key || this.pointer.toUpdateIndex;
+        const previous = this.pointer.children[prevIndex];
         if (previous && previous.component === component) {
             if (!key) {
                 this.pointer.toUpdateIndex++;
             }
-            previous.updated++;
             this.pointer = previous;
             this.pointer.props = props;
             this.pointer.rawChildren = children;
+            this.pointer.updated = {};
+            this.pointer.parent!.updated[prevIndex] = true;
         } else {
+            const nextKey = key || this.pointer.childrenCount.toString() || "";
             const nextStack: Stack = {
-                key: key || this.pointer.childrenCount.toString() || "",
+                key: nextKey,
                 children: {},
                 childrenCount: 0,
                 component: component,
                 toUpdateIndex: 0,
                 props: props,
                 rawChildren: children,
-                updated: this.pointer.updated,
+                updated: {},
                 parent: this.pointer,
                 hooks: new HooksStack(this.createUpdate(() => nextStack, onRerender)),
                 treeContext: {
@@ -367,6 +370,7 @@ class Context {
             this.pointer.children[nextStack.key] = nextStack;
             this.pointer.childrenCount++;
             this.pointer = nextStack;
+            this.pointer.parent!.updated[nextKey] = true;
         }
     };
     processJSXToHtml = (element: JSX.Element): RenderedType => {
@@ -394,7 +398,7 @@ class Context {
     endComponentStack = () => {
         for (const key in this.pointer.children) {
             const child = this.pointer.children[key];
-            if (child.updated < this.pointer.updated) {
+            if (!this.pointer.updated[child.key]) {
                 this.postUpdateActions.push(...this.collectUnmountHooks(child));
                 this.pointer.childrenCount--;
                 delete this.pointer.children[key];
@@ -420,6 +424,7 @@ class Context {
 let context = new Context();
 
 export const __reset = () => context.reset();
+export const __context = context;
 
 const populateFragment = (
     children: (Text | HTMLElement | DocumentFragment)[]
@@ -530,29 +535,39 @@ const createFragment = <T>(props: T | null, children: JSX.Element[]) => {
     return fragment;
 };
 
+const getChildProp = (children: JSX.Element[]) => {
+    if (Array.isArray(children) && children.length === 1) {
+        const singleChild = children[0];
+        if (
+            typeof singleChild === "function" &&
+            !isMarkedComponent(singleChild)
+        ) {
+            return singleChild;
+        }
+    }
+    return executeChildren(children);
+};
+
+const getCopiedProps = <T>(props: T | null, children: JSX.Element[]) => {
+    const copiedProps = Object.assign({}, props || {}) as any as T;
+    Object.defineProperty(copiedProps, "children", {
+        get() {
+            return getChildProp(children);
+        },
+    });
+    return copiedProps;
+};
+
 const createComponent = <T>(
     component: (props?: T) => JSX.Element,
     props: T | null,
     children: JSX.Element[],
     hasCorrectPointer = false
 ): HTMLElement | Text | DocumentFragment => {
-    const copiedProps = Object.assign({}, props || {}, {
-        get children() {
-            if (Array.isArray(children) && children.length === 1) {
-                const singleChild = children[0];
-                if (
-                    typeof singleChild === "function" &&
-                    !isMarkedComponent(singleChild)
-                ) {
-                    return singleChild;
-                }
-            }
-            return executeChildren(children);
-        },
-    }) as any as T;
+    const copiedProps = getCopiedProps(props, children);
     context.startComponentStack(
         component,
-        props,
+        copiedProps,
         children,
         hasCorrectPointer,
         (copiedProps as any).key?.toString(),
@@ -561,7 +576,7 @@ const createComponent = <T>(
             const original = stack.rendered;
             const next = createComponent(
                 component,
-                context.pointer.props,
+                getCopiedProps(context.pointer.props, context.pointer.rawChildren),
                 context.pointer.rawChildren,
                 true
             );
