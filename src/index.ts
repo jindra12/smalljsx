@@ -1,8 +1,3 @@
-const dispatchUpdate = () => {
-    const event = new CustomEvent("smalljsx-update");
-    document.dispatchEvent(event);
-};
-
 type RenderedType = Text | HTMLElement | DocumentFragment;
 type ChildType<T, TOriginal> = T extends { children: any }
     ? T & { key?: string | number }
@@ -272,14 +267,20 @@ type Stack = {
     rawChildren: JSX.Element[];
     rendered?: RenderedType;
     treeContext: Record<string, any>;
+    order: number;
 };
 
 const isPortal = (hook: any): hook is { portal: HTMLElement } =>
     Boolean(hook.portal instanceof HTMLElement);
 
+type PostUpdateAction = {
+    action: () => void,
+    componentOrder: number;
+};
+
 class Context {
     root: Stack = Context.createRoot();
-    postUpdateActions: Array<() => void> = [];
+    postUpdateActions: Array<PostUpdateAction> = [];
     pointer: Stack;
 
     private static createRoot = (): Stack => {
@@ -291,6 +292,7 @@ class Context {
             children: {},
             toUpdateIndex: 0,
             childrenCount: 0,
+            order: 0,
             updated: {},
             hooks: new HooksStack(),
             treeContext: {},
@@ -303,8 +305,11 @@ class Context {
     ) => {
         return () => {
             if (onRerender) {
-                this.postUpdateActions.push(onRerender(stack()));
-                dispatchUpdate();
+                const stk = stack();
+                this.postUpdateActions.push({
+                    componentOrder: stk.order,
+                    action: onRerender(stk),
+                });
             }
         };
     };
@@ -360,6 +365,7 @@ class Context {
                     childrenCount: 0,
                     component: component,
                     toUpdateIndex: 0,
+                    order: this.pointer.order + 1,
                     props: props,
                     rawChildren: children,
                     updated: {},
@@ -402,20 +408,23 @@ class Context {
         for (const key in this.pointer.children) {
             const child = this.pointer.children[key];
             if (!this.pointer.updated[child.key]) {
-                this.postUpdateActions.push(...this.collectUnmountHooks(child));
+                const postUnmount = this.collectUnmountHooks(child);
+                this.postUpdateActions.push(...postUnmount.map((p) => ({
+                    action: p,
+                    componentOrder: child.order,
+                })));
                 this.pointer.childrenCount--;
                 delete this.pointer.children[key];
             }
         }
         const postActions = this.pointer.hooks.postActions;
-        this.postUpdateActions.push(...postActions);
+        this.postUpdateActions.push(...postActions.map((p) => ({
+            action: p,
+            componentOrder: this.pointer.order,
+        })));
         this.pointer.hooks.reset();
         this.pointer.toUpdateIndex = 0;
         this.pointer = this.pointer.parent!;
-
-        if (postActions.length > 0) {
-            dispatchUpdate();
-        }
     };
     reset = () => {
         this.root = Context.createRoot();
@@ -702,7 +711,7 @@ export const mount = (
     }
     const postUpdate = () => {
         for (let i = 0; i < context.postUpdateActions.length; i++) {
-            context.postUpdateActions[i]();
+            context.postUpdateActions[i].action();
         }
         context.postUpdateActions = [];
     };

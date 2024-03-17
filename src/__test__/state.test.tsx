@@ -160,6 +160,49 @@ describe("Should update HTML structures with useState", () => {
         jest.runAllTimers();
         expect($(".test").text()).toBe("5 + 16");
     });
+    it("Can handle state updates across multiple components in opposite order", () => {
+        const Additive: Component = () => {
+            const [additive, setAdditive] = useState(1);
+            return <Multiplicative setAdditive={setAdditive} additive={additive} />;
+        };
+        const Multiplicative: Component<{
+            additive: number;
+            setAdditive: (value: number) => void;
+        }> = (props) => {
+            const [multiplicative, setMultiplicative] = useState(1);
+            return (
+                <div>
+                    State{" "}
+                    <div className="test">
+                        {props.additive} + {multiplicative}
+                    </div>
+                    <button
+                        id="click"
+                        onclick={() => {
+                            setMultiplicative(multiplicative * 2);
+                            props.setAdditive(props.additive + 1);
+                        }}
+                    >
+                        Update!
+                    </button>
+                </div>
+            );
+        };
+        mount(<Additive />, "#root");
+        expect($(".test").text()).toBe("1 + 1");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("2 + 2");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("3 + 4");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("4 + 8");
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($(".test").text()).toBe("5 + 16");
+    });
     it("Can handle state updates in components rendering content separately", () => {
         const Additive: Component = () => {
             const [additive, setAdditive] = useState(1);
