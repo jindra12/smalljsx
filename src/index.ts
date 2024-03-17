@@ -1,3 +1,8 @@
+const dispatchUpdate = () => {
+    const event = new CustomEvent("smalljsx-update");
+    document.dispatchEvent(event);
+};
+
 type RenderedType = Text | HTMLElement | DocumentFragment;
 type ChildType<T, TOriginal> = T extends { children: any }
     ? T & { key?: string | number }
@@ -310,6 +315,7 @@ class Context {
                     componentOrder: stk.order,
                     action: onRerender(stk),
                 });
+                dispatchUpdate();
             }
         };
     };
@@ -425,6 +431,10 @@ class Context {
         this.pointer.hooks.reset();
         this.pointer.toUpdateIndex = 0;
         this.pointer = this.pointer.parent!;
+
+        if (postActions.length > 0) {
+            dispatchUpdate();
+        }
     };
     reset = () => {
         this.root = Context.createRoot();
