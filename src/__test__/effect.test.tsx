@@ -184,4 +184,27 @@ describe("Can use before/after render effects", () => {
         expect(called).toEqual(1);
         expect(unmountContents).toEqual("2");
     });
+    it("Can use effect based on props update", () => {
+        let called = 0;
+        const Stateful = () => {
+            const [state, setState] = useState(0);
+            return (
+                <Efectful setState={setState} state={state} />
+            );
+        };
+        const Efectful: Component<{ setState: (value: number) => void, state: number }> = (props) => {
+            useEffect(() => {
+                called += 1;
+            }, "after-render", [props.state]);
+            return (
+                <button id="click" onclick={() => props.setState(props.state + 1)}>{props.state}</button>
+            );
+        };
+        mount(<Stateful />, "#root");
+        jest.runAllTimers();
+        expect(called).toEqual(1);
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect(called).toEqual(2);
+    });
 });

@@ -280,7 +280,6 @@ const isPortal = (hook: any): hook is { portal: HTMLElement } =>
 
 type PostUpdateAction = {
     action: () => void,
-    componentOrder: number;
 };
 
 class Context {
@@ -312,7 +311,6 @@ class Context {
             if (onRerender) {
                 const stk = stack();
                 this.postUpdateActions.push({
-                    componentOrder: stk.order,
                     action: onRerender(stk),
                 });
                 dispatchUpdate();
@@ -400,12 +398,12 @@ class Context {
             portal.portal.innerHTML = "";
             portal.portal.appendChild(toRender);
             const placeholder = document.createTextNode("");
-            if (!this.pointer.rendered) {
-                this.pointer.rendered = placeholder;
-            }
+            this.pointer.rendered = placeholder;
             return placeholder;
-        }
-        if (!this.pointer.rendered) {
+        } else {
+            if (this.pointer.rendered) {
+                replaceChild(toRender, this.pointer.rendered);
+            }
             this.pointer.rendered = toRender;
         }
         return toRender;
@@ -417,7 +415,6 @@ class Context {
                 const postUnmount = this.collectUnmountHooks(child);
                 this.postUpdateActions.push(...postUnmount.map((p) => ({
                     action: p,
-                    componentOrder: child.order,
                 })));
                 this.pointer.childrenCount--;
                 delete this.pointer.children[key];
@@ -426,7 +423,6 @@ class Context {
         const postActions = this.pointer.hooks.postActions;
         this.postUpdateActions.push(...postActions.map((p) => ({
             action: p,
-            componentOrder: this.pointer.order,
         })));
         this.pointer.hooks.reset();
         this.pointer.toUpdateIndex = 0;
@@ -592,15 +588,12 @@ const createComponent = <T>(
         (copiedProps as any).key?.toString(),
         (stack) => () => {
             context.pointer = stack;
-            const original = stack.rendered;
-            const next = createComponent(
+            createComponent(
                 component,
                 getCopiedProps(context.pointer.props, context.pointer.rawChildren),
                 context.pointer.rawChildren,
                 true
             );
-            replaceChild(next, original!);
-            stack.rendered = next;
             return;
         }
     );
