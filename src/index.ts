@@ -216,17 +216,14 @@ export const createContext: ContextType = <T>(defaultValue?: T | undefined) => {
     return context;
 };
 
-export const useSetContext = <T>(
-    treeContext: TreeContext<T>,
-    nextState?: T
-) => {
+export const useSetContext = <T>(treeContext: TreeContext<T>, nextState: T) => {
     const treeContexts = context.pointer.treeContext;
-    treeContexts[treeContext.id] = nextState || treeContext.defaultValue;
+    treeContexts[treeContext.id] = nextState;
 };
 
 export const useContext = <T>(treeContext: TreeContext<T>): T => {
     const treeContexts = context.pointer.treeContext;
-    return treeContexts[treeContext.id] || treeContext.defaultValue;
+    return treeContexts[treeContext.id];
 };
 
 export const useCallback = <T extends (...args: any[]) => any>(
@@ -337,40 +334,46 @@ class Context {
             const ptr = this.pointer;
             this.pointer.hooks.onRerender = this.createUpdate(() => ptr, onRerender);
             this.pointer.updated = {};
-            return;
-        }
-        const prevIndex = key || this.pointer.toUpdateIndex;
-        const previous = this.pointer.children[prevIndex];
-        if (previous && previous.component === component) {
-            if (!key) {
-                this.pointer.toUpdateIndex++;
-            }
-            this.pointer = previous;
-            this.pointer.props = props;
-            this.pointer.rawChildren = children;
-            this.pointer.updated = {};
-            this.pointer.parent!.updated[prevIndex] = true;
-        } else {
-            const nextKey = key || this.pointer.childrenCount.toString() || "";
-            const nextStack: Stack = {
-                key: nextKey,
-                children: {},
-                childrenCount: 0,
-                component: component,
-                toUpdateIndex: 0,
-                props: props,
-                rawChildren: children,
-                updated: {},
-                parent: this.pointer,
-                hooks: new HooksStack(this.createUpdate(() => nextStack, onRerender)),
-                treeContext: {
-                    ...this.pointer.treeContext,
-                },
+            this.pointer.treeContext = {
+                ...this.pointer.parent?.treeContext,
             };
-            this.pointer.children[nextStack.key] = nextStack;
-            this.pointer.childrenCount++;
-            this.pointer = nextStack;
-            this.pointer.parent!.updated[nextKey] = true;
+        } else {
+            const prevIndex = key || this.pointer.toUpdateIndex;
+            const previous = this.pointer.children[prevIndex];
+            if (previous && previous.component === component) {
+                if (!key) {
+                    this.pointer.toUpdateIndex++;
+                }
+                this.pointer = previous;
+                this.pointer.props = props;
+                this.pointer.rawChildren = children;
+                this.pointer.updated = {};
+                this.pointer.parent!.updated[prevIndex] = true;
+                this.pointer.treeContext = {
+                    ...this.pointer.parent?.treeContext,
+                };
+            } else {
+                const nextKey = key || this.pointer.childrenCount.toString() || "";
+                const nextStack: Stack = {
+                    key: nextKey,
+                    children: {},
+                    childrenCount: 0,
+                    component: component,
+                    toUpdateIndex: 0,
+                    props: props,
+                    rawChildren: children,
+                    updated: {},
+                    parent: this.pointer,
+                    hooks: new HooksStack(this.createUpdate(() => nextStack, onRerender)),
+                    treeContext: {
+                        ...this.pointer.treeContext,
+                    },
+                };
+                this.pointer.children[nextStack.key] = nextStack;
+                this.pointer.childrenCount++;
+                this.pointer = nextStack;
+                this.pointer.parent!.updated[nextKey] = true;
+            }
         }
     };
     processJSXToHtml = (element: JSX.Element): RenderedType => {
@@ -538,10 +541,7 @@ const createFragment = <T>(props: T | null, children: JSX.Element[]) => {
 const getChildProp = (children: JSX.Element[]) => {
     if (Array.isArray(children) && children.length === 1) {
         const singleChild = children[0];
-        if (
-            typeof singleChild === "function" &&
-            !isMarkedComponent(singleChild)
-        ) {
+        if (typeof singleChild === "function" && !isMarkedComponent(singleChild)) {
             return singleChild;
         }
     }
@@ -667,13 +667,14 @@ const appendChildDeconstruction = (
 ) => {
     if (Array.isArray(item)) {
         item.forEach((i) => appendChildDeconstruction(i, mount));
+    } else {
+        const element = (
+            item instanceof HTMLElement || item instanceof DocumentFragment
+                ? item
+                : document.createTextNode(item?.toString() || "")
+        ) as HTMLElement;
+        appendChild(mount, element);
     }
-    const element = (
-        item instanceof HTMLElement || item instanceof DocumentFragment
-            ? item
-            : document.createTextNode(item?.toString() || "")
-    ) as HTMLElement;
-    appendChild(mount, element);
 };
 
 export const mount = (
