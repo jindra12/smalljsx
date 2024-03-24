@@ -1,0 +1,19 @@
+{
+  "name": "smalljsx-testproject",
+  "version": "1.0.0",
+  "description": "SmallJSX test project",
+  "main": "./dist/index.js",
+  "repository": "https://github.com/jindra12/smalljsx.git",
+  "author": "Jan Jindráček",
+  "license": "MIT",
+  "scripts": {
+    "build": "rm ./dist/*.js ./dist/*.d.ts; yarn tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "smalljsx": "../dist"
+  }
+}

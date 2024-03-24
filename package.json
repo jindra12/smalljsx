@@ -7,7 +7,7 @@
   "author": "Jan Jindráček",
   "license": "MIT",
   "scripts": {
-    "build": "rm ./dist/*.js ./dist/*.d.ts; yarn tsc; rm -rf ./dist/__test__",
+    "build": "rm ./dist/*.js ./dist/*.d.ts; yarn tsc; rm -rf ./dist/__test__;",
     "test": "yarn jest --watch",
     "test:open": "concurrently 'yarn test' 'yarn jest-preview'"
   },

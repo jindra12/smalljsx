@@ -1,3 +1,5 @@
+export * from "./jsx";
+
 const dispatchUpdate = () => {
     const event = new CustomEvent("smalljsx-update");
     document.dispatchEvent(event);
@@ -14,11 +16,11 @@ export type ParentComponent<T extends object = {}> = (
     props: ChildType<T, JSX.Element>
 ) => JSX.Element;
 
-class Fragment { }
+class FragmentClass { }
 
 const isFragmentConstructor = (
     component: any
-): component is new () => Fragment => component === Fragment;
+): component is new () => JSX.Fragment => component === FragmentClass;
 
 let count = 0;
 const getUniqueId = () => {
@@ -278,7 +280,7 @@ const isPortal = (hook: any): hook is { portal: HTMLElement } =>
     Boolean(hook.portal instanceof HTMLElement);
 
 type PostUpdateAction = {
-    action: () => void,
+    action: () => void;
 };
 
 class Context {
@@ -410,17 +412,21 @@ class Context {
             const child = this.pointer.children[key];
             if (!this.pointer.updated[child.key]) {
                 const postUnmount = this.collectUnmountHooks(child);
-                this.postUpdateActions.push(...postUnmount.map((p) => ({
-                    action: p,
-                })));
+                this.postUpdateActions.push(
+                    ...postUnmount.map((p) => ({
+                        action: p,
+                    }))
+                );
                 this.pointer.childrenCount--;
                 delete this.pointer.children[key];
             }
         }
         const postActions = this.pointer.hooks.postActions;
-        this.postUpdateActions.push(...postActions.map((p) => ({
-            action: p,
-        })));
+        this.postUpdateActions.push(
+            ...postActions.map((p) => ({
+                action: p,
+            }))
+        );
         this.pointer.hooks.reset();
         this.pointer.toUpdateIndex = 0;
         this.pointer = this.pointer.parent!;
@@ -441,9 +447,7 @@ let context = new Context();
 export const __reset = () => context.reset();
 export const __context = context;
 
-const populateFragment = (
-    children: RenderedType[]
-) => {
+const populateFragment = (children: RenderedType[]) => {
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < children.length; i++) {
         appendChild(fragment, children[i]);
@@ -631,7 +635,7 @@ const traverseDownForChildren = (element: ParentRendered): ParentRendered[] => {
             if (child instanceof DocumentFragment) {
                 const traversed = traverseDownForChildren(child);
                 for (let i = 0; i < traversed.length; i++) {
-                    acc.push(traversed[i]);   
+                    acc.push(traversed[i]);
                 }
             } else {
                 acc.push(child);
@@ -647,8 +651,8 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
         original.parentElement?.replaceChild(next, original);
         next.__parent = original.__parent;
         if (original.__parent) {
-            original.__parent.__children = original.__parent?.__children?.filter((child) =>
-                child === original ? next : child
+            original.__parent.__children = original.__parent?.__children?.filter(
+                (child) => (child === original ? next : child)
             );
         }
     } else {
@@ -660,8 +664,8 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
             realParent?.replaceChild(next, realChildren[0]);
             next.__parent = original.__parent;
             if (original.__parent) {
-                original.__parent.__children = original.__parent?.__children?.filter((child) =>
-                    child === original ? next : child
+                original.__parent.__children = original.__parent?.__children?.filter(
+                    (child) => (child === original ? next : child)
                 );
             }
             for (let i = 1; i < realChildren.length; i++) {
@@ -750,8 +754,8 @@ const markAsComponent = <T>(toMark: T & { __marked?: boolean }): T => {
     return toMark;
 };
 
-export const h = <T>(
-    component: (new () => Fragment) | ((props?: T) => JSX.Element) | string,
+export const mountFn = <T>(
+    component: (new () => JSX.Fragment) | ((props?: T) => JSX.Element) | string,
     props: T | null,
     ...children: JSX.Element[]
 ) => {
@@ -767,6 +771,6 @@ export const h = <T>(
 };
 
 if (typeof window !== undefined) {
-    (window as any).h = h;
-    (window as any).Fragment = Fragment;
+    (window as any).h = mountFn;
+    (window as any).Fragment = FragmentClass;
 }
