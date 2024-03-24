@@ -32,6 +32,35 @@ describe("Can use fragments", () => {
             '<div id="root">Click me!<div>Not me!</div></div>'
         );
     });
+    it("Won't cause conflicts between child and parent re-renders", () => {
+        const Parent: Small.ParentComponent = (props) => {
+            const [state, setState] = Small.useState(0);
+            return (
+                <>
+                    {props.children}
+                    <div>Not me!</div>
+                    <button id="click" onclick={() => setState(state + 1)}>{state}</button>
+                </>
+            );
+        };
+        const Component: Small.Component = () => {
+            return (
+                <Parent>
+                    <div>Click me!</div>
+                </Parent>
+            );
+        };
+        Small.mount(<Component />, "#root");
+        jest.runAllTimers();
+        expect($("#root")[0].outerHTML).toEqual(
+            '<div id=\"root\"><div>Click me!</div><div>Not me!</div><button id=\"click\">0</button></div>'
+        );
+        $("#click")[0].click();
+        jest.runAllTimers();
+        expect($("#root")[0].outerHTML).toEqual(
+            '<div id=\"root\"><div>Click me!</div><div>Not me!</div><button id=\"click\">1</button></div>'
+        );
+    });
     it("Can render multiple children on mount", () => {
         Small.mount(
             <>

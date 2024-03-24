@@ -272,7 +272,6 @@ type Stack = {
     rawChildren: JSX.Element[];
     rendered?: RenderedType;
     treeContext: Record<string, any>;
-    order: number;
 };
 
 const isPortal = (hook: any): hook is { portal: HTMLElement } =>
@@ -296,7 +295,6 @@ class Context {
             children: {},
             toUpdateIndex: 0,
             childrenCount: 0,
-            order: 0,
             updated: {},
             hooks: new HooksStack(),
             treeContext: {},
@@ -369,7 +367,6 @@ class Context {
                     childrenCount: 0,
                     component: component,
                     toUpdateIndex: 0,
-                    order: this.pointer.order + 1,
                     props: props,
                     rawChildren: children,
                     updated: {},
@@ -445,7 +442,7 @@ export const __reset = () => context.reset();
 export const __context = context;
 
 const populateFragment = (
-    children: (Text | HTMLElement | DocumentFragment)[]
+    children: RenderedType[]
 ) => {
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < children.length; i++) {
@@ -560,7 +557,9 @@ const getChildProp = (children: JSX.Element[]) => {
             return singleChild;
         }
     }
-    return executeChildren(children);
+
+    const executed = executeChildren(children);
+    return executed;
 };
 
 const getCopiedProps = <T>(props: T | null, children: JSX.Element[]) => {
@@ -578,7 +577,7 @@ const createComponent = <T>(
     props: T | null,
     children: JSX.Element[],
     hasCorrectPointer = false
-): HTMLElement | Text | DocumentFragment => {
+): RenderedType => {
     const copiedProps = getCopiedProps(props, children);
     context.startComponentStack(
         component,
@@ -630,7 +629,10 @@ const traverseDownForChildren = (element: ParentRendered): ParentRendered[] => {
     return (
         element.__children?.reduce((acc: ParentRendered[], child) => {
             if (child instanceof DocumentFragment) {
-                acc.push(...traverseDownForChildren(child));
+                const traversed = traverseDownForChildren(child);
+                for (let i = 0; i < traversed.length; i++) {
+                    acc.push(traversed[i]);   
+                }
             } else {
                 acc.push(child);
             }
@@ -644,9 +646,11 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
     if (!isOriginalFragment) {
         original.parentElement?.replaceChild(next, original);
         next.__parent = original.__parent;
-        original.__parent?.__children?.filter((child) =>
-            child === original ? next : child
-        );
+        if (original.__parent) {
+            original.__parent.__children = original.__parent?.__children?.filter((child) =>
+                child === original ? next : child
+            );
+        }
     } else {
         const realParent = traverseUpForRealParent(original);
         const realChildren = traverseDownForChildren(original).filter((child) =>
@@ -655,9 +659,11 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
         if (realChildren.length > 0) {
             realParent?.replaceChild(next, realChildren[0]);
             next.__parent = original.__parent;
-            original.__parent?.__children?.filter((child) =>
-                child === original ? next : child
-            );
+            if (original.__parent) {
+                original.__parent.__children = original.__parent?.__children?.filter((child) =>
+                    child === original ? next : child
+                );
+            }
             for (let i = 1; i < realChildren.length; i++) {
                 realParent?.removeChild(realChildren[i]);
             }
