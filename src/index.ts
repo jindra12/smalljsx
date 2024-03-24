@@ -667,6 +667,8 @@ const replaceChild = (next: ParentRendered, original: ParentRendered) => {
             for (let i = 1; i < realChildren.length; i++) {
                 realParent?.removeChild(realChildren[i]);
             }
+        } else if (realParent) {
+            appendChild(realParent, next);
         }
     }
 };
